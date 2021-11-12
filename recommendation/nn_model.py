@@ -22,7 +22,8 @@ class RecommendationModel(object):
         self.colour_count = colour_count
         self.recommend_num = recommend_num
 
-    def forward(self, input_colours, recommend_colours_1, click_colour_1, recommend_colours_2, click_colour_2):
+    def forward(self, input_colours, recommend_colours_1, click_colour_1, recommend_colours_2, click_colour_2,
+                country, uid):
         pass
 
     def input_to_one_hot(self, input_colours):
@@ -48,7 +49,8 @@ class RecommendationModel(object):
         return tf.nn.softmax(last_layer)
 
     def output(self, input):
-        return tf.math.argmax(input, 1)
+        top_values, top_indices = tf.nn.top_k(input, k=self.recommend_num)
+        return top_indices
 
     def loss(self, logits, labels):
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels,
@@ -58,7 +60,7 @@ class RecommendationModel(object):
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
-    m = RecommendationModel(colour_count=20, recommend_num=6)
+    m = RecommendationModel(colour_count=200, recommend_num=6)
     input = [3, 6, 15]
     forward_output = m.forward_1(input_colours=input)
     output = m.output(forward_output)
