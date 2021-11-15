@@ -35,14 +35,14 @@ class RecommendationModel(object):
         last_layer = self.network(concat_layer, [8, 4, self.colour_count])
         return last_layer
 
-    def features(self, uids, countrys, recommend_colours_1, click_colour_1, recommend_colours_2, click_colour_2):
-        user = self.input_to_one_hot(uids, self.user_count)
-        country = self.input_to_one_hot(countrys, self.country_count)
-        r_c_1 = self.input_to_n_hot(recommend_colours_1, self.colour_count)
-        c_c_1 = self.input_to_one_hot(click_colour_1, self.colour_count)
-        r_c_2 = self.input_to_n_hot(recommend_colours_2, self.colour_count)
-        c_c_2 = self.input_to_one_hot(click_colour_2, self.colour_count)
-        return {'user': user, 'country': country, 'recommend_colours_1': r_c_1, 'click_colour_1': c_c_1,
+    def features(self, features):
+        user_fs = self.input_to_one_hot(features['user'], self.user_count)
+        country_fs = self.input_to_one_hot(features['country'], self.country_count)
+        r_c_1 = self.input_to_n_hot(features['recommend_colours_1'], self.colour_count)
+        c_c_1 = self.input_to_one_hot_plus(features['click_colour_1'], self.colour_count)
+        r_c_2 = self.input_to_n_hot(features['recommend_colours_2'], self.colour_count)
+        c_c_2 = self.input_to_one_hot_plus(features['click_colour_2'], self.colour_count)
+        return {'user': user_fs, 'country': country_fs, 'recommend_colours_1': r_c_1, 'click_colour_1': c_c_1,
                 'recommend_colours_2': r_c_2, 'click_colour_2': c_c_2}
 
     def network(self, inputs, units):
@@ -50,7 +50,6 @@ class RecommendationModel(object):
         layer = first_layer
         for i in units[1:]:
             layer = tf.layers.dense(inputs=layer, units=i, kernel_initializer=tf.initializers.random_normal())
-            print(i)
         return layer
 
     def input_to_one_hot(self, input, size):
@@ -65,7 +64,7 @@ class RecommendationModel(object):
         batch_size = tf.shape(input)[0]
         ex_input = tf.expand_dims(input, 2)
         indices = tf.expand_dims(tf.range(0, batch_size, 1), 1)
-        indices = tf.expand_dims(tf.broadcast_to(input=indices, shape=[batch_size, 3]), 2)
+        indices = tf.expand_dims(tf.broadcast_to(input=indices, shape=[batch_size, self.recommend_num]), 2)
         concat = tf.concat([indices, ex_input], -1)
         concat = tf.reshape(concat, [-1, 2])
         concat = tf.cast(concat, tf.int64)
@@ -74,6 +73,22 @@ class RecommendationModel(object):
                                    sparse_values=1.0,
                                    default_value=0.0)
         return n_hot
+
+    def input_to_one_hot_plus(self, input, size):
+        condition_mask = tf.greater_equal(input, tf.constant(0))
+        partitioned_data = tf.dynamic_partition(
+            input, tf.cast(condition_mask, tf.int32), 2)
+        batch_size = tf.size(partitioned_data[1])
+        labels_1 = tf.expand_dims(partitioned_data[1], 1)
+        indices = tf.expand_dims(tf.range(0, batch_size, 1), 1)
+        concat = tf.concat([indices, labels_1], 1)
+        one_hot = tf.sparse_to_dense(concat, tf.stack([batch_size, size]), 1.0, 0.0)
+        ss = tf.shape(partitioned_data[0])
+        zz = tf.zeros(shape=[ss[0], size])
+        condition_indices = tf.dynamic_partition(
+            tf.range(tf.shape(input)[0]), tf.cast(condition_mask, tf.int32), 2)
+        res = tf.dynamic_stitch(condition_indices, [zz, one_hot])
+        return res
 
     def forward_1(self, users):
         inputs = self.input_to_one_hot(users, self.user_count)
@@ -85,8 +100,9 @@ class RecommendationModel(object):
         top_values, top_indices = tf.nn.top_k(input, k=self.recommend_num)
         return top_indices
 
-    def inference(self, ):
-        l = self.forward()
+    def inference(self, features):
+        fs = self.features(features)
+        l = self.forward(fs)
         return self.output(l)
 
     def loss(self, logits, labels):
@@ -100,11 +116,12 @@ if __name__ == '__main__':
     m = RecommendationModel(colour_count=10, recommend_num=3, user_count=10, country_count=5)
     batch_size = 3
     users = [1, 5, 8]
-    countrys = [0, 2, 3]
-    color = [[0, 1, 9], [3, 6, 8], [4, 5, 6]]
-    click = [1, 6, 5]
-    fs = m.features(uids=users, countrys=countrys, recommend_colours_1=color, click_colour_1=click,
-                    recommend_colours_2=color, click_colour_2=click)
+    country = [0, 2, 3]
+    color = [[1, 2, 9], [3, 6, 8], [4, 5, 6]]
+    click = [1, -1, 5]
+    features = {'user': users, 'country': country, 'recommend_colours_1': color, 'click_colour_1': click,
+                'recommend_colours_2': color, 'click_colour_2': click}
+    fs = m.features(features)
     output = m.forward(fs)
     output = m.output(output)
     init_op = tf.global_variables_initializer()
