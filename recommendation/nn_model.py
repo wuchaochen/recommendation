@@ -48,10 +48,10 @@ class RecommendationModel(object):
                 'recommend_colours_2': r_c_2, 'click_colour_2': c_c_2}
 
     def network(self, inputs, units):
-        first_layer = tf.layers.dense(inputs=inputs, units=units[0], kernel_initializer=tf.initializers.random_normal())
+        first_layer = tf.layers.dense(inputs=inputs, units=units[0], kernel_initializer=tf.initializers.truncated_normal())
         layer = first_layer
         for i in units[1:]:
-            layer = tf.layers.dense(inputs=layer, units=i, kernel_initializer=tf.initializers.random_normal())
+            layer = tf.layers.dense(inputs=layer, units=i, kernel_initializer=tf.initializers.random_uniform())
         return layer
 
     def input_to_one_hot(self, input, size):
@@ -100,7 +100,7 @@ class RecommendationModel(object):
     def output(self, input):
         input = tf.nn.softmax(input)
         top_values, top_indices = tf.nn.top_k(input, k=self.recommend_num)
-        return top_indices, top_values
+        return top_indices
 
     def inference(self, features):
         fs = self.features(features)
@@ -118,8 +118,8 @@ class RecommendationModel(object):
         indices = tf.expand_dims(tf.range(0, batch_size, 1), 1)
         concat = tf.concat([indices, labels_1], 1)
         st = tf.SparseTensor(indices=tf.cast(concat, tf.int64),
-                                 values=tf.ones(shape=[batch_size], dtype=tf.int32),
-                                 dense_shape=[batch_size, size])
+                             values=tf.ones(shape=[batch_size], dtype=tf.int32),
+                             dense_shape=[batch_size, size])
         result = tf.feature_column.embedding_column(st, dimension=dimension)
         return result
 
@@ -133,7 +133,8 @@ class Sample(object):
 
         def parse_csv(value):
             columns = tf.decode_csv(value, record_defaults=[0, 0, '0,0,0,0,0,0', 0, '0,0,0,0,0,0', 0], field_delim=' ')
-            return columns[0], columns[1], multiply_split(columns[2]), columns[3], multiply_split(columns[4]), columns[5]
+            return columns[0], columns[1], multiply_split(columns[2]), columns[3], multiply_split(columns[4]), columns[
+                5]
 
         ds = tf.data.TextLineDataset(filenames=[file_path])
         ds = ds.map(parse_csv)
@@ -174,6 +175,6 @@ if __name__ == '__main__':
 
     with tf.Session() as session:
         session.run(init_op)
-        res = session.run([output])
-        tf.logging.info(res)
-
+        for i in range(2):
+            res = session.run([columns[0], columns[1], output])
+            tf.logging.info(res)

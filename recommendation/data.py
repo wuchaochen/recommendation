@@ -96,4 +96,4 @@ if __name__ == '__main__':
     # colour_data = ColourData(100, 3)
     # print(colour_data.random_colours())
     s_data = SampleData(user_count=10000, country_count=100, colour_count=128, select_count=6)
-    s_data.create_data(100, os.path.dirname(__file__) + '/../data/')
+    s_data.create_data(1000000, os.path.dirname(__file__) + '/../data/')
