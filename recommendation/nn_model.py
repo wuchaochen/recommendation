@@ -14,6 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import os
+
 import tensorflow as tf
 
 
@@ -25,14 +27,14 @@ class RecommendationModel(object):
         self.country_count = country_count
 
     def forward(self, features):
-        user_layer = self.network(features['user'], [8, 3, 4])
-        country_layer = self.network(features['country'], [4, 2])
+        user_layer = self.network(features['user'], [8])
+        country_layer = self.network(features['country'], [4])
         click_1_feature = tf.concat([features['recommend_colours_1'], features['click_colour_1']], axis=1)
-        r_1 = self.network(click_1_feature, [3, 2])
+        r_1 = self.network(click_1_feature, [8, 3, 3])
         click_2_feature = tf.concat([features['recommend_colours_2'], features['click_colour_2']], axis=1)
-        r_2 = self.network(click_2_feature, [3, 2])
+        r_2 = self.network(click_2_feature, [8, 3, 3])
         concat_layer = tf.concat([user_layer, country_layer, r_1, r_2], axis=1)
-        last_layer = self.network(concat_layer, [8, 4, self.colour_count])
+        last_layer = self.network(concat_layer, [8, 4, 4, self.colour_count])
         return last_layer
 
     def features(self, features):
@@ -98,7 +100,7 @@ class RecommendationModel(object):
     def output(self, input):
         input = tf.nn.softmax(input)
         top_values, top_indices = tf.nn.top_k(input, k=self.recommend_num)
-        return top_indices
+        return top_indices, top_values
 
     def inference(self, features):
         fs = self.features(features)
@@ -110,22 +112,68 @@ class RecommendationModel(object):
                                                                                logits=logits))
         return cross_entropy
 
+    def sparse_feature(self, input, size, dimension):
+        batch_size = tf.size(input)
+        labels_1 = tf.expand_dims(input, 1)
+        indices = tf.expand_dims(tf.range(0, batch_size, 1), 1)
+        concat = tf.concat([indices, labels_1], 1)
+        st = tf.SparseTensor(indices=tf.cast(concat, tf.int64),
+                                 values=tf.ones(shape=[batch_size], dtype=tf.int32),
+                                 dense_shape=[batch_size, size])
+        result = tf.feature_column.embedding_column(st, dimension=dimension)
+        return result
+
+
+class Sample(object):
+    @staticmethod
+    def read_csv(file_path, batch_size):
+        def multiply_split(value):
+            tmp = tf.strings.to_number(tf.sparse.to_dense(tf.string_split([value], sep=',')), tf.int32)
+            return tf.squeeze(tmp)
+
+        def parse_csv(value):
+            columns = tf.decode_csv(value, record_defaults=[0, 0, '0,0,0,0,0,0', 0, '0,0,0,0,0,0', 0], field_delim=' ')
+            return columns[0], columns[1], multiply_split(columns[2]), columns[3], multiply_split(columns[4]), columns[5]
+
+        ds = tf.data.TextLineDataset(filenames=[file_path])
+        ds = ds.map(parse_csv)
+        ds = ds.repeat(2)
+        return ds.batch(batch_size)
+
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
-    m = RecommendationModel(colour_count=10, recommend_num=3, user_count=10, country_count=5)
-    batch_size = 3
-    users = [1, 5, 8]
-    country = [0, 2, 3]
-    color = [[1, 2, 9], [3, 6, 8], [4, 5, 6]]
-    click = [1, -1, 5]
-    features = {'user': users, 'country': country, 'recommend_colours_1': color, 'click_colour_1': click,
-                'recommend_colours_2': color, 'click_colour_2': click}
+    sample = Sample()
+    # m = RecommendationModel(colour_count=10, recommend_num=3, user_count=10, country_count=5)
+    # batch_size = 3
+    # users = [1, 5, 8]
+    # country = [0, 2, 3]
+    # color = [[1, 2, 9], [3, 6, 8], [4, 5, 6]]
+    # click = [1, -1, 5]
+    # features = {'user': users, 'country': country, 'recommend_colours_1': color, 'click_colour_1': click,
+    #             'recommend_colours_2': color, 'click_colour_2': click}
+
+    # fs = m.features(features)
+    # output = m.forward(fs)
+    # output = m.output(output)
+    # init_op = tf.global_variables_initializer()
+    # output = m.sparse_feature(users, 10, 3)
+    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=10000, country_count=100)
+    dataset = sample.read_csv(os.path.dirname(__file__) + '/../data/sample.csv', batch_size=5)
+    iterator = dataset.make_one_shot_iterator()
+    columns = iterator.get_next()
+    features = {'user': columns[0], 'country': columns[1],
+                'recommend_colours_1': columns[2],
+                'click_colour_1': columns[3],
+                'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
+
     fs = m.features(features)
     output = m.forward(fs)
     output = m.output(output)
     init_op = tf.global_variables_initializer()
+
     with tf.Session() as session:
         session.run(init_op)
         res = session.run([output])
         tf.logging.info(res)
+
