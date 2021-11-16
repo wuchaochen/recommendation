@@ -17,9 +17,14 @@
 import random
 import csv
 import os
+import time
+import pandas as pd
+import copy
+from recommendation import nn_model
 
 
 def random_item(size):
+    random.seed(time.time_ns())
     return random.randint(0, size - 1)
 
 
@@ -29,15 +34,10 @@ class UserData(object):
         self.user_count = user_count
         self.country_count = country_count
 
-    # def random_user_info(self):
-    #     with open(self.output_file, 'w') as f:
-    #         wr = csv.writer(f)
-    #         for i in range(self.user_count):
-    #             wr.writerow([i, random.randint(0, self.country_count - 1)])
-
     def random_user_info_dict(self):
         result = {}
         for i in range(self.user_count):
+            random.seed(time.time_ns())
             result[i] = random.randint(0, self.country_count - 1)
         return result
 
@@ -49,8 +49,11 @@ class ColourData(object):
         self.colours = range(count)
 
     def random_colours(self):
+        random.seed(time.time_ns())
         colours = random.sample(self.colours, self.select_count)
-        click = random.sample(colours, 1)
+        cc = copy.deepcopy(colours)
+        cc.append(-1)
+        click = random.sample(cc, 1)
         return colours, click
 
 
@@ -89,11 +92,37 @@ class SampleData(object):
             s_f.close()
 
 
+def gen_trained_data(input_file_path, output_file_path):
+    with open(input_file_path, 'r') as f:
+        d1 = pd.read_csv(f, names=['f1', 'f2', 'f3', 'f4', 'f5'], sep=' ')
+        d2 = d1.sort_values(by='f1')
+        key = -1
+        resume_record = None
+        with open(output_file_path, 'w') as wf:
+            wr = csv.writer(wf, delimiter=' ')
+            for index, row in d2.iterrows():
+                if row['f1'] == key:
+                    wr.writerow([row['f1'], row['f2'], row['f3'], row['f4'], resume_record[2], resume_record[3]])
+                    key = -1
+                    resume_record = None
+                else:
+                    key = row['f1']
+                    resume_record = row['f1'], row['f2'], row['f3'], row['f4']
+
+
+data_dir = os.path.dirname(__file__) + '/../data/'
+
+
+def pipeline():
+    s_data = SampleData(user_count=100, country_count=20, colour_count=128, select_count=6)
+    s_data.create_data(100000, data_dir)
+
+    nn_model.gen_sample_data(user_count=100, country_count=20)
+
+    gen_trained_data(data_dir + 'org_sample.csv', data_dir + 'no_label_sample.csv')
+
+    nn_model.gen_training_sample(user_count=100, country_count=20)
+
+
 if __name__ == '__main__':
-    # output_file = os.path.dirname(__file__) + '/../data/users.csv'
-    # user_data = UserData(user_count=10000, country_count=100, output_file=output_file)
-    # user_data.random_user_info()
-    # colour_data = ColourData(100, 3)
-    # print(colour_data.random_colours())
-    s_data = SampleData(user_count=10000, country_count=100, colour_count=128, select_count=6)
-    s_data.create_data(1000000, os.path.dirname(__file__) + '/../data/')
+    pipeline()

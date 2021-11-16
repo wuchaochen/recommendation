@@ -14,9 +14,16 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import csv
 import os
-
+import random
 import tensorflow as tf
+
+threshold = 0.3
+
+data_dir = os.path.dirname(__file__) + '/../data/'
+base_model_dir = os.path.dirname(__file__) + '/../models/base/'
+train_model_dir = os.path.dirname(__file__) + '/../models/train/'
 
 
 class RecommendationModel(object):
@@ -34,7 +41,7 @@ class RecommendationModel(object):
         click_2_feature = tf.concat([features['recommend_colours_2'], features['click_colour_2']], axis=1)
         r_2 = self.network(click_2_feature, [8, 3, 3])
         concat_layer = tf.concat([user_layer, country_layer, r_1, r_2], axis=1)
-        last_layer = self.network(concat_layer, [8, 4, 4, self.colour_count])
+        last_layer = self.network(concat_layer, [8, 4, self.colour_count])
         return last_layer
 
     def features(self, features):
@@ -92,15 +99,18 @@ class RecommendationModel(object):
         res = tf.dynamic_stitch(condition_indices, [zz, one_hot])
         return res
 
-    def forward_1(self, users):
-        inputs = self.input_to_one_hot(users, self.user_count)
-        last_layer = self.network(inputs=inputs, units=[5, 5, self.colour_count])
-        return tf.nn.softmax(last_layer)
-
     def output(self, input):
         input = tf.nn.softmax(input)
         top_values, top_indices = tf.nn.top_k(input, k=self.recommend_num)
-        return top_indices
+        return top_indices, top_values
+
+    def top_one_output(self, input):
+        input = tf.nn.softmax(input)
+        top_values, top_indices = tf.nn.top_k(input, k=1)
+        return tf.squeeze(top_indices), tf.squeeze(top_values)
+
+    def softmax(self, input):
+        return tf.nn.softmax(input)
 
     def inference(self, features):
         fs = self.features(features)
@@ -123,6 +133,16 @@ class RecommendationModel(object):
         result = tf.feature_column.embedding_column(st, dimension=dimension)
         return result
 
+    def acc(self, labels, predictions, element_count):
+        batch_size = tf.cast(tf.size(labels), tf.float32)
+        a = tf.tile(labels, [element_count])
+        a = tf.reshape(a, [element_count, batch_size])
+        a = tf.transpose(a)
+        a = tf.cast(tf.equal(a, predictions), tf.float32)
+        a = tf.reduce_sum(tf.matmul(a, tf.ones([element_count, 1])))
+        acc = a / batch_size
+        return acc
+
 
 class Sample(object):
     @staticmethod
@@ -138,29 +158,82 @@ class Sample(object):
 
         ds = tf.data.TextLineDataset(filenames=[file_path])
         ds = ds.map(parse_csv)
-        ds = ds.repeat(2)
+        ds = ds.repeat(1)
         return ds.batch(batch_size)
 
+    @staticmethod
+    def read_label_data(file_path, batch_size):
+        def multiply_split(value):
+            tmp = tf.strings.to_number(tf.sparse.to_dense(tf.string_split([value], sep=',')), tf.int32)
+            return tf.squeeze(tmp)
 
-if __name__ == '__main__':
-    tf.logging.set_verbosity(tf.logging.INFO)
+        def parse_csv(value):
+            columns = tf.decode_csv(value,
+                                    record_defaults=[0, 0, '0,0,0,0,0,0', 0, '0,0,0,0,0,0', 0, 0], field_delim=' ')
+            return columns[0], columns[1], multiply_split(columns[2]), columns[3], multiply_split(columns[4]), columns[
+                5], columns[6]
+
+        ds = tf.data.TextLineDataset(filenames=[file_path])
+        ds = ds.map(parse_csv)
+        ds = ds.repeat(-1)
+        return ds.batch(batch_size)
+
+    @staticmethod
+    def generate_sample(user, country, colour_and_value):
+        batch_size = len(user)
+        res = []
+        colour = colour_and_value[0]
+        value = colour_and_value[1]
+        for i in range(batch_size):
+            record = []
+            record.append(user[i])
+            record.append(country[i])
+            cc = colour[i].tolist()
+            cc = sorted(cc)
+            cc = ','.join(str(x) for x in cc)
+            record.append(cc)
+            if value[i][0] > threshold:
+                record.append(colour[i][0])
+            else:
+                record.append(-1)
+            record.append(value[i][0])
+            res.append(record)
+        return res
+
+    @staticmethod
+    def generate_label_sample(user, country, colour_1, click_1, colour_2, click_2, indices, values):
+        batch_size = len(user)
+        res = []
+        for i in range(batch_size):
+            record = []
+            record.append(user[i])
+            record.append(country[i])
+
+            cc = colour_1[i].tolist()
+            cc = sorted(cc)
+            cc = ','.join(str(x) for x in cc)
+            record.append(cc)
+            record.append(click_1[i])
+
+            cc = colour_2[i].tolist()
+            cc = sorted(cc)
+            cc = ','.join(str(x) for x in cc)
+            record.append(cc)
+            record.append(click_2[i])
+
+            if values[i] > threshold:
+                record.append(indices[i])
+            else:
+                record.append(-1)
+            res.append(record)
+        return res
+
+
+def gen_sample_data(user_count, country_count):
+    batch_size = 5
     sample = Sample()
-    # m = RecommendationModel(colour_count=10, recommend_num=3, user_count=10, country_count=5)
-    # batch_size = 3
-    # users = [1, 5, 8]
-    # country = [0, 2, 3]
-    # color = [[1, 2, 9], [3, 6, 8], [4, 5, 6]]
-    # click = [1, -1, 5]
-    # features = {'user': users, 'country': country, 'recommend_colours_1': color, 'click_colour_1': click,
-    #             'recommend_colours_2': color, 'click_colour_2': click}
-
-    # fs = m.features(features)
-    # output = m.forward(fs)
-    # output = m.output(output)
-    # init_op = tf.global_variables_initializer()
-    # output = m.sparse_feature(users, 10, 3)
-    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=10000, country_count=100)
-    dataset = sample.read_csv(os.path.dirname(__file__) + '/../data/sample.csv', batch_size=5)
+    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
+    dataset = sample.read_csv(os.path.dirname(__file__) + '/../data/sample.csv', batch_size=batch_size)
     iterator = dataset.make_one_shot_iterator()
     columns = iterator.get_next()
     features = {'user': columns[0], 'country': columns[1],
@@ -175,6 +248,100 @@ if __name__ == '__main__':
 
     with tf.Session() as session:
         session.run(init_op)
-        for i in range(2):
-            res = session.run([columns[0], columns[1], output])
-            tf.logging.info(res)
+        with open(os.path.dirname(__file__) + '/../data/org_sample.csv', 'w') as f:
+            w = csv.writer(f, delimiter=' ')
+            try:
+                while True:
+                    res = session.run([columns[0], columns[1], output])
+                    res = Sample.generate_sample(res[0], res[1], res[2])
+                    for j in res:
+                        w.writerow(j)
+            except Exception as e:
+                print('Read to end')
+            finally:
+                print('Generate org_sample.csv')
+
+
+def gen_training_sample(user_count, country_count):
+    batch_size = 5
+    sample = Sample()
+    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
+    dataset = sample.read_csv(data_dir + 'no_label_sample.csv', batch_size=batch_size)
+    iterator = dataset.make_one_shot_iterator()
+    columns = iterator.get_next()
+    features = {'user': columns[0], 'country': columns[1],
+                'recommend_colours_1': columns[2],
+                'click_colour_1': columns[3],
+                'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
+
+    fs = m.features(features)
+    output = m.forward(fs)
+    output = m.top_one_output(output)
+    global_step = tf.train.get_or_create_global_step()
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/1') as mon_sess:
+        i = 0
+        with open(data_dir + 'train_sample.csv', 'w') as f:
+            wr = csv.writer(f, delimiter=' ')
+            result_list = []
+            try:
+                while not mon_sess.should_stop():
+                    f, o = mon_sess.run([features, output])
+                    r = Sample.generate_label_sample(f['user'],
+                                                 f['country'],
+                                                 f['recommend_colours_1'],
+                                                 f['click_colour_1'],
+                                                 f['recommend_colours_2'],
+                                                 f['click_colour_2'],
+                                                 o[0], o[1])
+                    for i in r:
+                        result_list.append(i)
+            finally:
+                print('len:' + str(len(result_list)))
+                random.shuffle(result_list)
+                print('len:' + str(len(result_list)))
+
+                for j in result_list:
+                    wr.writerow(j)
+
+
+def train():
+    batch_size = 300
+    sample = Sample()
+    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
+    dataset = sample.read_label_data(data_dir + 'train_sample.csv', batch_size=batch_size)
+    iterator = dataset.make_one_shot_iterator()
+    columns = iterator.get_next()
+    features = {'user': columns[0], 'country': columns[1],
+                'recommend_colours_1': columns[2],
+                'click_colour_1': columns[3],
+                'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
+    labels = columns[6]
+    label_tensor = m.input_to_one_hot_plus(labels, m.colour_count)
+    fs = m.features(features)
+    last_layer = m.forward(fs)
+    top_indices, top_values = m.output(last_layer)
+    top_indices_real = tf.cast(top_indices, tf.int32)
+    acc = m.acc(labels, top_indices_real, m.recommend_num)
+    tf.summary.scalar(name='acc', tensor=acc)
+    loss = m.loss(logits=last_layer, labels=label_tensor)
+    tf.summary.scalar(name='loss', tensor=loss)
+    global_step = tf.train.get_or_create_global_step()
+    optimizer = tf.train.AdamOptimizer(learning_rate=1e-04)
+    train_op = optimizer.minimize(loss, global_step=global_step)
+    hooks = [tf.train.StopAtStepHook(last_step=4600)]
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=train_model_dir + '/1', hooks=hooks) as mon_sess:
+        step = 0
+        while not mon_sess.should_stop():
+            step += 1
+            _, acc_res, label_res, top_indices_real_res, loss_res, global_step_res \
+                = mon_sess.run([train_op, acc, labels, top_indices_real, loss, global_step])
+
+            if step % 100 == 0:
+                print("Train step %d, loss: %f acc: %f" % (step, loss_res, acc_res))
+                # print(label_res)
+                # print(top_indices_real_res)
+
+
+if __name__ == '__main__':
+    tf.logging.set_verbosity(tf.logging.INFO)
+    train()
