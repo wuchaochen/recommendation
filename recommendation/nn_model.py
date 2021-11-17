@@ -24,6 +24,7 @@ threshold = 0.3
 data_dir = os.path.dirname(__file__) + '/../data/'
 base_model_dir = os.path.dirname(__file__) + '/../models/base/'
 train_model_dir = os.path.dirname(__file__) + '/../models/train/'
+test_model_dir = os.path.dirname(__file__) + '/../models/test/'
 
 
 class RecommendationModel(object):
@@ -33,15 +34,15 @@ class RecommendationModel(object):
         self.user_count = user_count
         self.country_count = country_count
 
-    def forward(self, features):
-        user_layer = self.network(features['user'], [8])
-        country_layer = self.network(features['country'], [4])
+    def forward(self, features, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+        user_layer = self.network(features['user'], units[0])
+        country_layer = self.network(features['country'], units[1])
         click_1_feature = tf.concat([features['recommend_colours_1'], features['click_colour_1']], axis=1)
-        r_1 = self.network(click_1_feature, [8, 3, 3])
+        r_1 = self.network(click_1_feature, units[2])
         click_2_feature = tf.concat([features['recommend_colours_2'], features['click_colour_2']], axis=1)
-        r_2 = self.network(click_2_feature, [8, 3, 3])
+        r_2 = self.network(click_2_feature, units[3])
         concat_layer = tf.concat([user_layer, country_layer, r_1, r_2], axis=1)
-        last_layer = self.network(concat_layer, [8, 4, self.colour_count])
+        last_layer = self.network(concat_layer, [units[4], units[5], self.colour_count])
         return last_layer
 
     def features(self, features):
@@ -115,7 +116,7 @@ class RecommendationModel(object):
     def inference(self, features):
         fs = self.features(features)
         l = self.forward(fs)
-        return self.output(l)
+        return self.output(l)[0]
 
     def loss(self, logits, labels):
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels,
@@ -133,7 +134,7 @@ class RecommendationModel(object):
         result = tf.feature_column.embedding_column(st, dimension=dimension)
         return result
 
-    def acc(self, labels, predictions, element_count):
+    def accuracy(self, labels, predictions, element_count):
         batch_size = tf.cast(tf.size(labels), tf.float32)
         a = tf.tile(labels, [element_count])
         a = tf.reshape(a, [element_count, batch_size])
@@ -229,7 +230,8 @@ class Sample(object):
         return res
 
 
-def gen_sample_data(user_count, country_count):
+def gen_sample_data(user_count, country_count, index=1, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+    tf.reset_default_graph()
     batch_size = 5
     sample = Sample()
     m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
@@ -242,17 +244,15 @@ def gen_sample_data(user_count, country_count):
                 'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
 
     fs = m.features(features)
-    output = m.forward(fs)
+    output = m.forward(fs, units)
     output = m.output(output)
-    init_op = tf.global_variables_initializer()
-
-    with tf.Session() as session:
-        session.run(init_op)
-        with open(os.path.dirname(__file__) + '/../data/org_sample.csv', 'w') as f:
+    global_step = tf.train.get_or_create_global_step()
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/{}'.format(index)) as mon_sess:
+        with open(os.path.dirname(__file__) + '/../data/org_sample_{}.csv'.format(index), 'w') as f:
             w = csv.writer(f, delimiter=' ')
             try:
                 while True:
-                    res = session.run([columns[0], columns[1], output])
+                    res = mon_sess.run([columns[0], columns[1], output])
                     res = Sample.generate_sample(res[0], res[1], res[2])
                     for j in res:
                         w.writerow(j)
@@ -262,11 +262,14 @@ def gen_sample_data(user_count, country_count):
                 print('Generate org_sample.csv')
 
 
-def gen_training_sample(user_count, country_count):
+def gen_training_sample(user_count, country_count, index=1, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+    tf.reset_default_graph()
     batch_size = 5
     sample = Sample()
     m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
-    dataset = sample.read_csv(data_dir + 'no_label_sample.csv', batch_size=batch_size)
+    input_file = data_dir + 'no_label_sample_{}.csv'.format(index)
+    # input_file = data_dir + 'sample.csv'
+    dataset = sample.read_csv(input_file, batch_size=batch_size)
     iterator = dataset.make_one_shot_iterator()
     columns = iterator.get_next()
     features = {'user': columns[0], 'country': columns[1],
@@ -275,12 +278,11 @@ def gen_training_sample(user_count, country_count):
                 'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
 
     fs = m.features(features)
-    output = m.forward(fs)
+    output = m.forward(fs, units)
     output = m.top_one_output(output)
     global_step = tf.train.get_or_create_global_step()
-    with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/1') as mon_sess:
-        i = 0
-        with open(data_dir + 'train_sample.csv', 'w') as f:
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/{}'.format(index)) as mon_sess:
+        with open(data_dir + 'train_sample_{}.csv'.format(index), 'w') as f:
             wr = csv.writer(f, delimiter=' ')
             result_list = []
             try:
@@ -296,7 +298,6 @@ def gen_training_sample(user_count, country_count):
                     for i in r:
                         result_list.append(i)
             finally:
-                print('len:' + str(len(result_list)))
                 random.shuffle(result_list)
                 print('len:' + str(len(result_list)))
 
@@ -304,11 +305,12 @@ def gen_training_sample(user_count, country_count):
                     wr.writerow(j)
 
 
-def train():
+def train(index):
+    tf.reset_default_graph()
     batch_size = 300
     sample = Sample()
     m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
-    dataset = sample.read_label_data(data_dir + 'train_sample.csv', batch_size=batch_size)
+    dataset = sample.read_label_data(data_dir + 'train_sample_{}.csv'.format(index), batch_size=batch_size)
     iterator = dataset.make_one_shot_iterator()
     columns = iterator.get_next()
     features = {'user': columns[0], 'country': columns[1],
@@ -321,15 +323,18 @@ def train():
     last_layer = m.forward(fs)
     top_indices, top_values = m.output(last_layer)
     top_indices_real = tf.cast(top_indices, tf.int32)
-    acc = m.acc(labels, top_indices_real, m.recommend_num)
-    tf.summary.scalar(name='acc', tensor=acc)
+    acc = m.accuracy(labels, top_indices_real, m.recommend_num)
+    tf.summary.scalar(name='accuracy', tensor=acc, family='train')
     loss = m.loss(logits=last_layer, labels=label_tensor)
-    tf.summary.scalar(name='loss', tensor=loss)
+    tf.summary.scalar(name='loss', tensor=loss, family='train')
     global_step = tf.train.get_or_create_global_step()
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-04)
     train_op = optimizer.minimize(loss, global_step=global_step)
-    hooks = [tf.train.StopAtStepHook(last_step=4600)]
-    with tf.train.MonitoredTrainingSession(checkpoint_dir=train_model_dir + '/1', hooks=hooks) as mon_sess:
+    hooks = [tf.train.StopAtStepHook(last_step=5000)]
+    # ckpt_dir = test_model_dir + '/{}'.format(index)
+    ckpt_dir = test_model_dir + '/mix'
+
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=ckpt_dir, hooks=hooks) as mon_sess:
         step = 0
         while not mon_sess.should_stop():
             step += 1
@@ -337,11 +342,11 @@ def train():
                 = mon_sess.run([train_op, acc, labels, top_indices_real, loss, global_step])
 
             if step % 100 == 0:
-                print("Train step %d, loss: %f acc: %f" % (step, loss_res, acc_res))
-                # print(label_res)
-                # print(top_indices_real_res)
+                print("Train step %d, loss: %f accuracy: %f" % (step, loss_res, acc_res))
 
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
-    train()
+    # for i in range(1, 6):
+    #     train(i)
+    train(2)

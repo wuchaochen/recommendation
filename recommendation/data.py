@@ -22,6 +22,8 @@ import pandas as pd
 import copy
 from recommendation import nn_model
 
+data_dir = os.path.dirname(__file__) + '/../data/'
+
 
 def random_item(size):
     random.seed(time.time_ns())
@@ -62,6 +64,13 @@ class SampleData(object):
         self.user_data = UserData(user_count=user_count, country_count=country_count)
         self.colour_data = ColourData(count=colour_count, select_count=select_count)
 
+    @staticmethod
+    def load_user_dict():
+        with open(data_dir + '/users.csv', 'r') as f:
+            rr = csv.reader(f, delimiter=' ')
+            for i in range(rr.line_num):
+                print(rr.next())
+
     def create_data(self, num, output_dir=None):
         user_dict = self.user_data.random_user_info_dict()
         if output_dir is not None:
@@ -92,7 +101,9 @@ class SampleData(object):
             s_f.close()
 
 
-def gen_trained_data(input_file_path, output_file_path):
+def gen_trained_data(index=1):
+    input_file_path = data_dir + 'org_sample_{}.csv'.format(index)
+    output_file_path = data_dir + 'no_label_sample_{}.csv'.format(index)
     with open(input_file_path, 'r') as f:
         d1 = pd.read_csv(f, names=['f1', 'f2', 'f3', 'f4', 'f5'], sep=' ')
         d2 = d1.sort_values(by='f1')
@@ -110,19 +121,48 @@ def gen_trained_data(input_file_path, output_file_path):
                     resume_record = row['f1'], row['f2'], row['f3'], row['f4']
 
 
-data_dir = os.path.dirname(__file__) + '/../data/'
+def gen_mix_data():
+    with open(data_dir+'train_sample_1.csv', 'r') as f_1, open(data_dir+'train_sample_2.csv', 'r') as f_2:
+        lines_1 = f_1.readlines()
+        lines_2 = f_2.readlines()
+        l3 = lines_2[0: int(len(lines_2)/10)]
+        lines_1.extend(l3)
+        random.shuffle(lines_1)
+    with open(data_dir+'train_sample_3.csv', 'w') as f_3:
+        f_3.writelines(lines_1)
+
+
+def gen_split_data():
+    with open(data_dir+'train_sample_1.csv', 'r') as f_1:
+        lines_1 = f_1.readlines()
+        l1 = lines_1[0: int(len(lines_1)/2)]
+        l2 = lines_1[int(len(lines_1)/2):]
+    with open(data_dir+'train_sample_1_1.csv', 'w') as f_1_1:
+        f_1_1.writelines(l1)
+
+    with open(data_dir+'train_sample_1_2.csv', 'w') as f_1_2:
+        f_1_2.writelines(l2)
 
 
 def pipeline():
-    s_data = SampleData(user_count=100, country_count=20, colour_count=128, select_count=6)
-    s_data.create_data(100000, data_dir)
+    # s_data = SampleData(user_count=100, country_count=20, colour_count=128, select_count=6)
+    # s_data.create_data(100000, data_dir)
+    print('create random sample data.')
+    u = [[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]
 
-    nn_model.gen_sample_data(user_count=100, country_count=20)
+    for i in range(1, 6):
+        nn_model.gen_sample_data(user_count=100, country_count=20, index=i, units=u)
+        print('create sample data step 1, index: {}'.format(i))
 
-    gen_trained_data(data_dir + 'org_sample.csv', data_dir + 'no_label_sample.csv')
+        gen_trained_data(index=i)
+        print('create sample data step 2, index: {}'.format(i))
 
-    nn_model.gen_training_sample(user_count=100, country_count=20)
+        nn_model.gen_training_sample(user_count=100, country_count=20, index=i, units=u)
+        print('create sample data step 3, index: {}'.format(i))
 
 
 if __name__ == '__main__':
     pipeline()
+    # SampleData.load_user_dict()
+    # gen_mix_data()
+    # gen_split_data()
