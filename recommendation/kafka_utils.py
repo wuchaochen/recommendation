@@ -46,7 +46,6 @@ class KafkaUtils(object):
             for line in raw_data:
                 num += 1
                 producer.send(topic_name,
-                              key=bytes(str(uuid.uuid1()), encoding='utf8'),
                               value=bytes(line, encoding='utf8'))
                 if 0 == num % 1000:
                     print("send data {}".format(num))
