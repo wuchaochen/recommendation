@@ -76,13 +76,12 @@ class ModelTrainer(object):
                 step = 0
                 while not mon_sess.should_stop():
                     step += 1
-                    _, acc_res, label_res, top_indices_real_res, loss_res, global_step_res, fs \
-                        = mon_sess.run([train_op, acc, labels, top_indices_real, loss, global_step, features])
+                    _, acc_res, label_res, top_indices_real_res, loss_res, global_step_res \
+                        = mon_sess.run([train_op, acc, labels, top_indices_real, loss, global_step])
 
-                    if step % 1 == 0:
+                    if step % 100 == 0:
                         print("Index %d global_step %d step %d, loss: %f accuracy: %f"
                               % (index, global_step_res, step, loss_res, acc_res))
-                        # print(fs)
 
 
 def stream_train(context):

@@ -71,7 +71,8 @@ class TrainJob(object):
                             'topic' = 'raw_input',
                             'properties.bootstrap.servers' = 'localhost:9092',
                             'properties.group.id' = 'raw_input',
-                            'format' = 'raw',
+                            'format' = 'csv',
+                            'csv.field-delimiter' = '|',
                             'scan.startup.mode' = 'earliest-offset'
                         )
                     ''')

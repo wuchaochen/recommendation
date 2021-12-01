@@ -102,3 +102,4 @@ class KafkaUtils(object):
 
 if __name__ == '__main__':
     kafka_util = KafkaUtils()
+    kafka_util.read_data(topic='raw_input', count=100000)
