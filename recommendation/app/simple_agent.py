@@ -51,10 +51,10 @@ class SimpleAgent(object):
 if __name__ == '__main__':
     data_dir = os.path.join(os.path.dirname(__file__), '../../data/')
     agent = SimpleAgent(topic_name='raw_input',
-                        sample_data_1=data_dir + 'train_sample_1.csv',
-                        epoch_1=2,
+                        sample_data_1=data_dir + 'train_sample_2.csv',
+                        epoch_1=200,
                         sample_data_2=data_dir + 'train_sample_2.csv',
-                        epoch_2=2,
+                        epoch_2=0,
                         interval=10)
     agent.send_data_to_raw_input()
 

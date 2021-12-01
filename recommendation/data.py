@@ -20,7 +20,7 @@ import os
 import time
 import pandas as pd
 import copy
-from recommendation import nn_model
+from recommendation import data_utils
 
 data_dir = os.path.dirname(__file__) + '/../data/'
 
@@ -151,13 +151,13 @@ def pipeline():
     u = [[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]
 
     for i in range(1, 6):
-        nn_model.gen_sample_data(user_count=100, country_count=20, index=i, units=u)
+        data_utils.gen_sample_data(user_count=100, country_count=20, index=i, units=u)
         print('create sample data step 1, index: {}'.format(i))
 
         gen_trained_data(index=i)
         print('create sample data step 2, index: {}'.format(i))
 
-        nn_model.gen_training_sample(user_count=100, country_count=20, index=i, units=u)
+        data_utils.gen_training_sample(user_count=100, country_count=20, index=i, units=u)
         print('create sample data step 3, index: {}'.format(i))
 
 
