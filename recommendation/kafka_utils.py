@@ -64,17 +64,19 @@ class KafkaUtils(object):
         print(topics)
         self._clean_create(topic_name, topics)
 
-    def read_data(self, topic, count=None):
+    def read_data(self, topic, count=None, offset='earliest'):
         consumer = KafkaConsumer(topic, bootstrap_servers=[self.bootstrap_servers], group_id=str(
-            uuid.uuid1()), auto_offset_reset='earliest')
+            uuid.uuid1()), auto_offset_reset=offset)
         num = 0
+        result = []
         if count is None:
             count = sys.maxsize
         for message in consumer:
             num += 1
-            print(message.value)
-            if num > count:
+            result.append(message.value.decode("utf-8"))
+            if num >= count:
                 break
+        return result
 
     def read_data_into_file(self, topic, filepath, count=None):
         consumer = KafkaConsumer(topic, bootstrap_servers=[self.bootstrap_servers], group_id=str(
@@ -86,6 +88,7 @@ class KafkaUtils(object):
             for message in consumer:
                 num += 1
                 f.write(message.value)
+                f.write(b'\n')
                 if num >= count:
                     break
 

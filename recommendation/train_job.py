@@ -108,10 +108,18 @@ class TrainJob(object):
 
 
 if __name__ == '__main__':
+    batch_dir = '/tmp/model/batch/v1'
+    stream_dir = '/tmp/model/stream/v1'
+
     if os.path.exists('code.zip'):
         os.remove('code.zip')
     if os.path.exists('temp'):
         shutil.rmtree('temp')
     subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
-    # TrainJob.batch_train()
-    TrainJob.stream_train()
+    if os.path.exists(batch_dir):
+        shutil.rmtree(batch_dir)
+    TrainJob.batch_train()
+
+    # if os.path.exists(stream_dir):
+    #     shutil.rmtree(stream_dir)
+    # TrainJob.stream_train()
