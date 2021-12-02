@@ -66,10 +66,12 @@ class SampleData(object):
 
     @staticmethod
     def load_user_dict():
+        user_dict = {}
         with open(data_dir + '/users.csv', 'r') as f:
-            rr = csv.reader(f, delimiter=' ')
-            for i in range(rr.line_num):
-                print(rr.next())
+            for l in f.readlines():
+                tmp = l.split(' ')
+                user_dict[int(tmp[0])] = int(tmp[1][:-1])
+        return user_dict
 
     def create_data(self, num, output_dir=None):
         user_dict = self.user_data.random_user_info_dict()
@@ -162,7 +164,7 @@ def pipeline():
 
 
 if __name__ == '__main__':
-    pipeline()
-    # SampleData.load_user_dict()
+    # pipeline()
+    print(len(SampleData.load_user_dict()))
     # gen_mix_data()
     # gen_split_data()

@@ -109,6 +109,6 @@ def batch_train(context):
         return dataset
 
     trainer = ModelTrainer(tf_context=tf_context,
-                           hooks=[tf.train.StopAtStepHook(last_step=2000)],
+                           hooks=[tf.train.StopAtStepHook(last_step=2050)],
                            batch_size=batch_size)
     trainer.train(input_func=file_input_func)
