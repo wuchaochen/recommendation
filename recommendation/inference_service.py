@@ -16,10 +16,17 @@
 # under the License.
 import queue
 import random
+import threading
 import time
+from concurrent import futures
+import grpc
 import tensorflow as tf
-from recommendation.data import SampleData
+from recommendation.data import SampleData, ColourData
 from recommendation.code.r_model import RecommendationModel
+from recommendation.proto.service_pb2 import RecordRequest, RecordResponse
+from recommendation.proto.service_pb2_grpc import InferenceServiceServicer, add_InferenceServiceServicer_to_server
+from recommendation.app.agent_client import AgentClient
+from recommendation import db
 
 threshold = 0.3
 
@@ -64,6 +71,7 @@ class ModelInference(object):
         return results
 
     def inference_click(self, record):
+        print(record)
         indices_res, values_res = self.mon_sess.run([self.top_1_indices, self.top_1_values], feed_dict={'record:0': record})
         results = []
         if isinstance(indices_res, list):
@@ -83,68 +91,132 @@ class ModelInference(object):
         self.mon_sess.close()
 
 
-class Agent(object):
-    def __init__(self, user_count, checkpoint_dir):
-        self.user_count = user_count
-        self.mi = ModelInference(checkpoint_dir)
-
-    def request(self):
-        random.seed(time.time_ns())
-        return random.randint(0, self.user_count - 1)
-
-    def click(self, record):
-        return self.mi.inference_click(record=record)
-
-    def close(self):
-        self.mi.close()
-
-
-class InferenceService(object):
-    def __init__(self):
+class InferenceUtil(object):
+    def __init__(self, checkpoint_dir):
         self.user_dict = SampleData.load_user_dict()
-        self.agent = Agent(100)
         self.queue = queue.Queue(maxsize=500)
-        self.user_cache = {}  # uid: [(recommend_colours_1, click_1), (recommend_colours_2, click_2)]
+        self.colour_data = ColourData(count=128, select_count=6)
+        self.checkpoint_dir = checkpoint_dir
+        self.mi = None
+        self.agent_client = None
 
-    def start_agent(self):
-        pass
+    def random_click_record(self):
+        c1, c2 = self.colour_data.random_colours()
+        return sorted(c1), c2[0]
+
+    def init_model(self):
+        self.mi = ModelInference(self.checkpoint_dir)
+
+    def get_client(self):
+        if self.agent_client is None:
+            self.agent_client = AgentClient('localhost:30001')
+        return self.agent_client
+
+    @db.provide_session
+    def init_user_cache(self, session=None):
+        for k, v in self.user_dict.items():
+            user = db.User()
+            user.uid = k
+            user.country = v
+            user = session.query(db.User).filter(db.User.uid == k).first()
+            if user is None:
+                user = db.User()
+                user.uid = k
+                user.country = v
+                session.add(user)
+            else:
+                user.country = v
+            session.commit()
+        for i in range(len(self.user_dict)):
+            cc = []
+            for j in range(2):
+                r, c = self.random_click_record()
+                r = ','.join(map(lambda x: str(x), r))
+                cc.append((r, c))
+            user_click = session.query(db.UserClick).filter(db.UserClick.uid == i).first()
+            if user_click is None:
+                user_click = db.UserClick()
+                user_click.uid = i
+                user_click.fs_1 = cc[0][0] + ' ' + str(cc[0][1])
+                user_click.fs_2 = cc[1][0] + ' ' + str(cc[1][1])
+                session.add(user_click)
+            else:
+                user_click.fs_1 = cc[0][0] + ' ' + str(cc[0][1])
+                user_click.fs_2 = cc[1][0] + ' ' + str(cc[1][1])
+            session.commit()
+
+    def init(self):
+        self.init_model()
+        self.init_user_cache()
 
     def build_features(self, uid):
-        pass
+        record = []
+        record.append(uid)
+        record.append(self.user_dict[uid])
+        user_click = db.get_user_click_info(uid)
+        record.append(user_click.fs_1)
+        record.append(user_click.fs_2)
+        return ' '.join(map(lambda x: str(x), record))
 
     def inference(self, features):
-        pass
+        return self.mi.inference(features)
 
-    def write_log(self):
-        pass
+    def write_log(self, uid, inference_result, click_result):
+        print(uid, inference_result, click_result)
 
-    def update_state(self):
-        pass
+    def update_state(self, uid, inference_result, click_result):
+        db.update_user_click_info(uid=uid, fs=inference_result + ' ' + str(click_result))
 
-    def run(self):
-        self.start_agent()
-        while True:
-            uid = self.queue.get()
-            features = self.build_features(uid)
-            inference_result = self.inference(features)
-            click_result = self.agent.click(inference_result)
-            self.update_state()
-            self.write_log()
+    def process_request(self, uid):
+        features = self.build_features(uid)
+        inference_result = self.inference([features])
+        result = self.get_client().click(features)
+        self.update_state(uid, inference_result[0], result)
+        self.write_log(uid, inference_result[0], result)
+        return inference_result
+
+
+class InferenceService(InferenceServiceServicer):
+    def __init__(self, util: InferenceUtil):
+        self.util: InferenceUtil = util
+
+    def inference(self, request, context):
+        res = self.util.process_request(int(request.record))
+        return RecordResponse(record=res[0])
+
+
+class InferenceServer(object):
+    def __init__(self, checkpoint_dir):
+        db.init_db()
+        self.inference_util = InferenceUtil(checkpoint_dir)
+        self.inference_util.init_user_cache()
+        self.inference_util.init_model()
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        add_InferenceServiceServicer_to_server(InferenceService(self.inference_util), self.server)
+        self.server.add_insecure_port('[::]:' + str(30002))
+        self._stop = threading.Event()
+
+    def start(self):
+        self.server.start()
+        try:
+            while not self._stop.is_set():
+                self._stop.wait(3600)
+        except KeyboardInterrupt:
+            self.stop()
+
+    def stop(self):
+        self.server.stop(grace=True)
 
 
 if __name__ == '__main__':
     agent_model_dir = '/tmp/model/batch/v1'
     inference_model_dir = '/tmp/model/stream/v1'
-    agent = Agent(100, agent_model_dir)
-    record = ['88 5 12,36,53,58,103,115 115 53,58,68,103,106,115 103']
-    res = agent.click(record)
-    print(res)
-    agent.close()
-    # print(agent.request())
-    # records = ['88 5 12,36,53,58,103,115 115 53,58,68,103,106,115 103',
-    #            '73 17 8,66,76,83,109,120 8 3,8,32,76,83,109 8',
-    #            '73 17 8,66,76,83,109,120 8 3,8,32,76,83,109 8']
-    # inference = ModelInference(agent_model_dir)
-    # result = inference.inference_click(record=records)
-    # print(result)
-    # inference.close()
+
+    # inference_util = InferenceUtil(inference_model_dir)
+    # inference_util.init_user_cache()
+    # inference_util.init_model()
+    # res = inference_util.build_features(1)
+    # res = inference_util.inference([res])
+    # print(res)
+    is_ = InferenceServer(inference_model_dir)
+    is_.start()

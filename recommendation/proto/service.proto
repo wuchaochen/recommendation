@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option py_generic_services = true;
+package ai_flow;
+
+message RecordRequest {
+    string record = 1;
+}
+
+message RecordResponse {
+    string record = 1;
+}
+
+service AgentService {
+  rpc click(RecordRequest) returns(RecordResponse){
+
+  }
+}
+
+service InferenceService {
+  rpc inference(RecordRequest) returns(RecordResponse){
+
+  }
+}
