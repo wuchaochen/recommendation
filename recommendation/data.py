@@ -20,9 +20,12 @@ import os
 import time
 import pandas as pd
 import copy
-from recommendation import data_utils
+import tensorflow as tf
+from recommendation.code.r_model import RecommendationModel, Sample
+threshold = 0.3
 
 data_dir = os.path.dirname(__file__) + '/../data/'
+base_model_dir = os.path.dirname(__file__) + '/../models/base/'
 
 
 def random_item(size):
@@ -103,6 +106,134 @@ class SampleData(object):
             s_f.close()
 
 
+class SampleGenerator(object):
+
+    @staticmethod
+    def generate_sample(user, country, colour_and_value):
+        batch_size = len(user)
+        res = []
+        colour = colour_and_value[0]
+        value = colour_and_value[1]
+        for i in range(batch_size):
+            record = []
+            record.append(user[i])
+            record.append(country[i])
+            cc = colour[i].tolist()
+            cc = sorted(cc)
+            cc = ','.join(str(x) for x in cc)
+            record.append(cc)
+            if value[i][0] > threshold:
+                record.append(colour[i][0])
+            else:
+                record.append(-1)
+            record.append(value[i][0])
+            res.append(record)
+        return res
+
+    @staticmethod
+    def generate_label_sample(user, country, colour_1, click_1, colour_2, click_2, indices, values):
+        batch_size = len(user)
+        res = []
+        for i in range(batch_size):
+            record = []
+            record.append(user[i])
+            record.append(country[i])
+
+            cc = colour_1[i].tolist()
+            cc = sorted(cc)
+            cc = ','.join(str(x) for x in cc)
+            record.append(cc)
+            record.append(click_1[i])
+
+            cc = colour_2[i].tolist()
+            cc = sorted(cc)
+            cc = ','.join(str(x) for x in cc)
+            record.append(cc)
+            record.append(click_2[i])
+
+            if values[i] > threshold:
+                record.append(indices[i])
+            else:
+                record.append(-1)
+            res.append(record)
+        return res
+
+
+def gen_sample_data(user_count, country_count, index=1, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+    tf.reset_default_graph()
+    batch_size = 5
+    sample = Sample()
+    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
+    dataset = sample.read_csv(data_dir + '/sample.csv', batch_size=batch_size)
+    iterator = dataset.make_one_shot_iterator()
+    columns = iterator.get_next()
+    features = {'user': columns[0], 'country': columns[1],
+                'recommend_colours_1': columns[2],
+                'click_colour_1': columns[3],
+                'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
+
+    fs = m.features(features)
+    output = m.forward(fs, units)
+    output = m.output(output)
+    global_step = tf.train.get_or_create_global_step()
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/{}'.format(index)) as mon_sess:
+        with open(data_dir + '/org_sample_{}.csv'.format(index), 'w') as f:
+            w = csv.writer(f, delimiter=' ')
+            try:
+                while True:
+                    res = mon_sess.run([columns[0], columns[1], output])
+                    res = SampleGenerator.generate_sample(res[0], res[1], res[2])
+                    for j in res:
+                        w.writerow(j)
+            except Exception as e:
+                print('Read to end')
+            finally:
+                print('Generate org_sample.csv')
+
+
+def gen_training_sample(user_count, country_count, index=1, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+    tf.reset_default_graph()
+    batch_size = 5
+    sample = Sample()
+    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
+    input_file = data_dir + 'no_label_sample_{}.csv'.format(index)
+    # input_file = data_dir + 'sample.csv'
+    dataset = sample.read_csv(input_file, batch_size=batch_size)
+    iterator = dataset.make_one_shot_iterator()
+    columns = iterator.get_next()
+    features = {'user': columns[0], 'country': columns[1],
+                'recommend_colours_1': columns[2],
+                'click_colour_1': columns[3],
+                'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
+
+    fs = m.features(features)
+    output = m.forward(fs, units)
+    output = m.top_one_output(output)
+    global_step = tf.train.get_or_create_global_step()
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/{}'.format(index)) as mon_sess:
+        with open(data_dir + 'train_sample_{}.csv'.format(index), 'w') as f:
+            wr = csv.writer(f, delimiter=' ')
+            result_list = []
+            try:
+                while not mon_sess.should_stop():
+                    f, o = mon_sess.run([features, output])
+                    r = SampleGenerator.generate_label_sample(f['user'],
+                                                 f['country'],
+                                                 f['recommend_colours_1'],
+                                                 f['click_colour_1'],
+                                                 f['recommend_colours_2'],
+                                                 f['click_colour_2'],
+                                                 o[0], o[1])
+                    for i in r:
+                        result_list.append(i)
+            finally:
+                random.shuffle(result_list)
+                print('len:' + str(len(result_list)))
+
+                for j in result_list:
+                    wr.writerow(j)
+
+
 def gen_trained_data(index=1):
     input_file_path = data_dir + 'org_sample_{}.csv'.format(index)
     output_file_path = data_dir + 'no_label_sample_{}.csv'.format(index)
@@ -147,24 +278,24 @@ def gen_split_data():
 
 
 def pipeline():
-    # s_data = SampleData(user_count=100, country_count=20, colour_count=128, select_count=6)
-    # s_data.create_data(100000, data_dir)
+    s_data = SampleData(user_count=100, country_count=20, colour_count=128, select_count=6)
+    s_data.create_data(100000, data_dir)
     print('create random sample data.')
     u = [[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]
 
     for i in range(1, 6):
-        data_utils.gen_sample_data(user_count=100, country_count=20, index=i, units=u)
+        gen_sample_data(user_count=100, country_count=20, index=i, units=u)
         print('create sample data step 1, index: {}'.format(i))
 
         gen_trained_data(index=i)
         print('create sample data step 2, index: {}'.format(i))
 
-        data_utils.gen_training_sample(user_count=100, country_count=20, index=i, units=u)
+        gen_training_sample(user_count=100, country_count=20, index=i, units=u)
         print('create sample data step 3, index: {}'.format(i))
 
 
 if __name__ == '__main__':
-    # pipeline()
-    print(len(SampleData.load_user_dict()))
+    pipeline()
+    # print(len(SampleData.load_user_dict()))
     # gen_mix_data()
     # gen_split_data()
