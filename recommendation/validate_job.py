@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     ValidateJob.batch_validate(checkpoint_dir='/tmp/model/batch/v1',
                                data_count=1000,
-                               validate_files=os.path.dirname(__file__) + '/../data/train_sample_3.csv')
+                               validate_files=os.path.dirname(__file__) + '/../data/train_sample_2.csv')
     # ValidateJob.stream_validate(checkpoint_dir='/tmp/model/stream/v1',
     #                             data_count=1000,
     #                             topic='raw_input')

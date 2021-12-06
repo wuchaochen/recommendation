@@ -40,7 +40,6 @@ class ModelInference(object):
         def multiply_split(value):
             tmp = tf.strings.to_number(tf.sparse.to_dense(tf.string_split(value, sep=',')), tf.int32)
             return tmp
-            # return tf.squeeze(tmp)
 
         def parse_csv(value):
             columns_ = tf.decode_csv(value,
@@ -161,18 +160,12 @@ class InferenceUtil(object):
     def inference(self, features):
         return self.mi.inference(features)
 
-    def write_log(self, uid, inference_result, click_result):
-        print(uid, inference_result, click_result)
-
     def update_state(self, uid, inference_result, click_result):
         db.update_user_click_info(uid=uid, fs=inference_result + ' ' + str(click_result))
 
     def process_request(self, uid):
         features = self.build_features(uid)
         inference_result = self.inference([features])
-        result = self.get_client().click(features)
-        self.update_state(uid, inference_result[0], result)
-        self.write_log(uid, inference_result[0], result)
         return inference_result
 
 
@@ -187,7 +180,7 @@ class InferenceService(InferenceServiceServicer):
 
 class InferenceServer(object):
     def __init__(self, checkpoint_dir):
-        db.init_db()
+        db.init_db(uri='mysql://root:chen@localhost:3306/user_info')
         self.inference_util = InferenceUtil(checkpoint_dir)
         self.inference_util.init_user_cache()
         self.inference_util.init_model()
@@ -209,8 +202,7 @@ class InferenceServer(object):
 
 
 if __name__ == '__main__':
-    agent_model_dir = '/tmp/model/batch/v1'
-    inference_model_dir = '/tmp/model/stream/v1'
+    inference_model_dir = '/tmp/model/2'
 
     # inference_util = InferenceUtil(inference_model_dir)
     # inference_util.init_user_cache()
