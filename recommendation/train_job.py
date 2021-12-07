@@ -30,6 +30,7 @@ class TrainJob(object):
     def batch_train():
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
+        statement_set = table_env.create_statement_set()
 
         work_num = 2
         ps_num = 1
@@ -45,8 +46,9 @@ class TrainJob(object):
 
         tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
 
-        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()])
-        model = tensorflow.fit(table_env=table_env)
+        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
+                                table_env, statement_set)
+        model = tensorflow.fit()
         model.save("/tmp/model/batch/v1")
         model.statement_set.execute().wait()
 
@@ -54,6 +56,7 @@ class TrainJob(object):
     def stream_train():
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
+        statement_set = table_env.create_statement_set()
 
         def input_table():
             table_env.execute_sql('''
@@ -92,7 +95,9 @@ class TrainJob(object):
 
         tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
 
-        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()])
+        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
+                                table_env=table_env,
+                                statement_set=statement_set)
         model = tensorflow.fit(input_tb)
         model.save("/tmp/model/stream/v1")
         model.statement_set.execute().wait()
