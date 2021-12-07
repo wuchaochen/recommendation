@@ -14,24 +14,63 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import logging
+import os
+import shutil
 import sys
+import time
+
 import tensorflow as tf
 from flink_ml_tensorflow.tensorflow_context import TFContext
+
 from r_model import Sample, RecommendationModel
+
+logger = logging.getLogger(__name__)
+
+
+class CheckpointSaver(tf.train.CheckpointSaverListener):
+
+    def __init__(self, checkpoint_dir, target_dir):
+        self.checkpoint_dir = checkpoint_dir
+        self.target_dir = target_dir
+
+    def copy_checkpoint(self):
+        target = os.path.join(self.target_dir, str(time.time()))
+        logger.info("Copying model checkpoint from {} to {}".format(self.checkpoint_dir, target))
+        shutil.copytree(self.checkpoint_dir, target)
+        logger.info("Checkpoint copy completed")
+
+
+class StreamCheckpointSaver(CheckpointSaver):
+
+    def __init__(self, checkpoint_dir, target_dir):
+        super().__init__(checkpoint_dir, target_dir)
+
+    def after_save(self, session, global_step_value):
+        self.copy_checkpoint()
+
+
+class BatchCheckpointSaver(CheckpointSaver):
+
+    def __init__(self, checkpoint_dir, target_dir):
+        super().__init__(checkpoint_dir, target_dir)
+
+    def end(self, session, global_step_value):
+        self.copy_checkpoint()
 
 
 class ModelTrainer(object):
-    def __init__(self, tf_context, hooks, batch_size):
+    def __init__(self, tf_context, hooks, batch_size, chief_only_hooks=None):
         self.tf_context = tf_context
         self.hooks = hooks
         self.batch_size = batch_size
+        self.chief_only_hooks = chief_only_hooks if chief_only_hooks else []
 
     def train(self, input_func):
         job_name = self.tf_context.get_role_name()
         index = self.tf_context.get_index()
         cluster_json = self.tf_context.get_tf_cluster()
         print(cluster_json)
-        checkpoint_dir = self.tf_context.properties['model_save_path']
         sys.stdout.flush()
         cluster = tf.train.ClusterSpec(cluster=cluster_json)
         server = tf.train.Server(cluster, job_name=job_name, task_index=index)
@@ -70,9 +109,8 @@ class ModelTrainer(object):
             with tf.train.MonitoredTrainingSession(master=server.target,
                                                    is_chief=is_chief,
                                                    config=sess_config,
-                                                   checkpoint_dir=checkpoint_dir,
                                                    hooks=self.hooks,
-                                                   save_checkpoint_secs=30) as mon_sess:
+                                                   chief_only_hooks=self.chief_only_hooks) as mon_sess:
                 step = 0
                 while not mon_sess.should_stop():
                     step += 1
@@ -93,9 +131,18 @@ def stream_train(context):
         dataset = Sample.read_flink_dataset(dataset, batch_size)
         return dataset
 
+    checkpoint_dir = tf_context.properties['checkpoint_dir']
+    model_save_path = tf_context.properties['model_save_path']
+    checkpoint_saver = StreamCheckpointSaver(checkpoint_dir, model_save_path)
+    checkpoint_saver_hook = tf.train.CheckpointSaverHook(checkpoint_dir,
+                                                         save_steps=None,
+                                                         save_secs=60,
+                                                         listeners=[checkpoint_saver])
+
     trainer = ModelTrainer(tf_context=tf_context,
                            hooks=[],
-                           batch_size=batch_size)
+                           batch_size=batch_size,
+                           chief_only_hooks=[checkpoint_saver_hook])
     trainer.train(input_func=flink_input_func)
 
 
@@ -108,7 +155,16 @@ def batch_train(context):
         dataset = Sample.read_label_data(file_path=input_files, batch_size=batch_size)
         return dataset
 
+    checkpoint_dir = tf_context.properties['checkpoint_dir']
+    model_save_path = tf_context.properties['model_save_path']
+    checkpoint_saver = BatchCheckpointSaver(checkpoint_dir, model_save_path)
+    checkpoint_saver_hook = tf.train.CheckpointSaverHook(checkpoint_dir,
+                                                         save_steps=None,
+                                                         save_secs=30,
+                                                         listeners=[checkpoint_saver])
+
     trainer = ModelTrainer(tf_context=tf_context,
                            hooks=[tf.train.StopAtStepHook(last_step=2050)],
-                           batch_size=batch_size)
+                           batch_size=batch_size,
+                           chief_only_hooks=[checkpoint_saver_hook])
     trainer.train(input_func=file_input_func)
