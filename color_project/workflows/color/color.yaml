@@ -1,0 +1,20 @@
+data_process:
+  job_type: flink
+  properties:
+    run_mode: local
+
+batch_train:
+  job_type: flink
+  properties:
+    run_mode: local
+
+stream_train:
+  job_type: flink
+  properties:
+    run_mode: local
+
+batch_validate:
+  job_type: python
+
+stream_validate:
+  job_type: python
