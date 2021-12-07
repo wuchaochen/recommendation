@@ -14,14 +14,36 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import os
 from recommendation import kafka_utils
 
+KafkaConn = 'localhost:9092'
+RawQueueName = 'raw_input'
+SampleQueueName = 'sample_input'
+DbConn = 'mysql://root:chen@localhost:3306/user_info'
+ModelDir = '/tmp/model'
+BaseModelDir = ModelDir + '/base'
+TrainModelDir = ModelDir + '/train'
+DataDir = '/tmp/data'
+UserDictFile = DataDir + '/users.csv'
+SampleFileDir = DataDir + '/samples'
 
-def init_env():
+
+def init():
     kafka_util = kafka_utils.KafkaUtils()
-    kafka_util.create_topic('raw_input')
-    kafka_util.create_topic('sample_input')
+    kafka_util.create_topic(RawQueueName)
+    kafka_util.create_topic(SampleQueueName)
+    if not os.path.exists(ModelDir):
+        os.makedirs(ModelDir)
+    if not os.path.exists(BaseModelDir):
+        os.makedirs(BaseModelDir)
+    if not os.path.exists(TrainModelDir):
+        os.makedirs(TrainModelDir)
+    if not os.path.exists(DataDir):
+        os.makedirs(DataDir)
+    if not os.path.exists(SampleFileDir):
+        os.makedirs(SampleFileDir)
 
 
 if __name__ == '__main__':
-    init_env()
+    init()

@@ -18,6 +18,7 @@ import os
 from pyflink.table import EnvironmentSettings, TableEnvironment, ScalarFunction, FunctionContext, DataTypes
 from pyflink.table.udf import udf
 from recommendation import db
+from recommendation import config
 
 data_dir = os.path.join(os.path.dirname(__file__), '../data/')
 
@@ -28,7 +29,7 @@ class BuildFeature(ScalarFunction):
         super().__init__()
 
     def open(self, function_context: FunctionContext):
-        db.init_db(uri='mysql://root:chen@localhost:3306/user_info')
+        db.init_db(uri=config.DbConn)
 
     def eval(self, uid, country, infer, click, f1, f2):
         print(uid)
@@ -91,7 +92,7 @@ class DataProcessor(object):
                         'sink.rolling-policy.rollover-interval' = '60sec',
                         'sink.rolling-policy.check-interval' = '10sec'
                     )
-                '''.format(data_dir + '/output'))
+                '''.format(config.SampleFileDir))
 
         t_env.execute_sql('''
                     create table user_c (
@@ -128,15 +129,6 @@ class DataProcessor(object):
                     on t.uid = uc.uid
         ''')
         st_1 = t_env.create_statement_set()
-        # st_1.add_insert_sql('''
-        #     insert into print
-        #         select feature(t.uid, t.country, t.infer, t.click, uc.fs_1, uc.fs_2) from
-        #             (select r.uid, c.country, r.infer, r.click, r.proc_time from raw_input as r
-        #                 left outer join user_c FOR SYSTEM_TIME AS OF r.proc_time AS c
-        #                 on r.uid = c.uid) as t
-        #             left outer join user_click FOR SYSTEM_TIME AS OF t.proc_time AS uc
-        #             on t.uid = uc.uid
-        # ''')
         st_1.add_insert('sample_queue', result)
         st_1.add_insert('sample_files', result)
         st_1.execute().get_job_client().get_job_execution_result().result()

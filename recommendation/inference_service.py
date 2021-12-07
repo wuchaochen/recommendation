@@ -31,6 +31,7 @@ from recommendation.proto.service_pb2 import RecordRequest, RecordResponse
 from recommendation.proto.service_pb2_grpc import InferenceServiceServicer, add_InferenceServiceServicer_to_server
 from recommendation.app.agent_client import AgentClient
 from recommendation import db
+from recommendation import config
 
 threshold = 0.3
 
@@ -208,7 +209,7 @@ class InferenceService(InferenceServiceServicer):
 
 class InferenceServer(object):
     def __init__(self, checkpoint_dir):
-        db.init_db(uri='mysql://root:chen@localhost:3306/user_info')
+        db.init_db(uri=config.DbConn)
         self.inference_util = InferenceUtil(checkpoint_dir)
         self.inference_util.init_user_cache()
         self.inference_util.init_model()

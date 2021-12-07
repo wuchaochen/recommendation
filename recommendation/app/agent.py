@@ -30,6 +30,7 @@ from recommendation.proto.service_pb2_grpc import AgentServiceServicer, AgentSer
     add_AgentServiceServicer_to_server
 from recommendation.inference_client import InferenceClient
 from recommendation import db
+from recommendation import config
 
 
 class UpdateModel(EventWatcher):
@@ -123,7 +124,7 @@ class AgentServer(object):
         self._stop = threading.Event()
 
     def start(self):
-        db.init_db(uri='mysql://root:chen@localhost:3306/user_info')
+        db.init_db(uri=config.DbConn)
         self.server.start()
         time.sleep(1)
         self.agent.start()
