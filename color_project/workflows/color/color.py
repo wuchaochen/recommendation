@@ -15,13 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.
 import ai_flow as af
-from color_processor.validate_processor import BatchValidateProcessor
+from color_processor.validate_processor import BatchValidateProcessor, StreamValidateProcessor
+from color_processor.sample_processor import SampleProcessor
 
 
 def workflow():
     af.init_ai_flow_context()
     with af.job_config(job_name='batch_validate'):
         af.user_define_operation(input=None, processor=BatchValidateProcessor())
+
+    with af.job_config(job_name='stream_validate'):
+        af.user_define_operation(input=None, processor=StreamValidateProcessor())
+
+    with af.job_config(job_name='data_process'):
+        af.user_define_operation(input=None, processor=SampleProcessor())
 
     # Run workflow
     af.workflow_operation.stop_all_workflow_executions(af.current_workflow_config().workflow_name)
