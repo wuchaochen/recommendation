@@ -15,14 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
-import subprocess
 import shutil
-from pyflink.datastream.stream_execution_environment import StreamExecutionEnvironment
-from pyflink.table import StreamTableEnvironment
+import subprocess
 
 from flink_ml_tensorflow.tensorflow_TFConfig import TFConfig
-from flink_ml_tensorflow.tensorflow_on_flink_table import train
+from flink_ml_tensorflow.tensorflow_on_flink_ml import Tensorflow
 from flink_ml_tensorflow.tensorflow_on_flink_mlconf import MLCONSTANTS
+from pyflink.datastream.stream_execution_environment import StreamExecutionEnvironment
+from pyflink.table import StreamTableEnvironment, DataTypes
 
 
 class TrainJob(object):
@@ -45,16 +45,17 @@ class TrainJob(object):
                 'input_files': os.path.dirname(__file__) + '/../data/train_sample_2.csv'}
         env_path = None
 
-        input_tb = None
-        output_schema = None
-
         tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
 
-        train(stream_env, table_env, statement_set, input_tb, tf_config, output_schema)
+        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
+                                table_env, statement_set)
+        model = tensorflow.fit()
 
-        job_client = statement_set.execute().get_job_client()
-        if job_client is not None:
-            job_client.get_job_execution_result().result()
+        model_version_dir = "/tmp/model_versions/batch/v1"
+        if os.path.exists(model_version_dir):
+            shutil.rmtree(model_version_dir)
+        model.save(model_version_dir)
+        model.statement_set.execute().wait()
 
     @staticmethod
     def stream_train():
@@ -96,30 +97,36 @@ class TrainJob(object):
         env_path = None
 
         input_tb = input_table()
-        output_schema = None
 
         tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
 
-        train(stream_env, table_env, statement_set, input_tb, tf_config, output_schema)
+        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
+                                table_env=table_env,
+                                statement_set=statement_set)
+        model = tensorflow.fit(input_tb)
 
-        job_client = statement_set.execute().get_job_client()
-        if job_client is not None:
-            job_client.get_job_execution_result().result()
+        model_version_dir = "/tmp/model_versions/stream/v1"
+        if os.path.exists(model_version_dir):
+            shutil.rmtree(model_version_dir)
+        model.save(model_version_dir)
+        model.statement_set.execute().wait()
 
 
 if __name__ == '__main__':
     batch_dir = '/tmp/model/batch/v1'
+    batch_model_version_dir = '/tmp/model_versions/batch/v1'
     stream_dir = '/tmp/model/stream/v1'
+    stream_model_version_dir = '/tmp/model_versions/stream/v1'
 
-    # if os.path.exists('code.zip'):
-    #     os.remove('code.zip')
-    # if os.path.exists('temp'):
-    #     shutil.rmtree('temp')
-    # subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
+    if os.path.exists('code.zip'):
+        os.remove('code.zip')
+    if os.path.exists('temp'):
+        shutil.rmtree('temp')
+    subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
     # if os.path.exists(batch_dir):
     #     shutil.rmtree(batch_dir)
     # TrainJob.batch_train()
 
-    # if os.path.exists(stream_dir):
-    #     shutil.rmtree(stream_dir)
+    if os.path.exists(stream_dir):
+        shutil.rmtree(stream_dir)
     TrainJob.stream_train()
