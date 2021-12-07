@@ -14,7 +14,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import logging
+
 import tensorflow as tf
+
+logger = logging.getLogger(__name__)
 
 
 class RecommendationModel(object):
@@ -46,7 +50,8 @@ class RecommendationModel(object):
                 'recommend_colours_2': r_c_2, 'click_colour_2': c_c_2}
 
     def network(self, inputs, units):
-        first_layer = tf.layers.dense(inputs=inputs, units=units[0], kernel_initializer=tf.initializers.truncated_normal())
+        first_layer = tf.layers.dense(inputs=inputs, units=units[0],
+                                      kernel_initializer=tf.initializers.truncated_normal())
         layer = first_layer
         for i in units[1:]:
             layer = tf.layers.dense(inputs=layer, units=i, kernel_initializer=tf.initializers.random_uniform())
@@ -153,7 +158,7 @@ class Sample(object):
         return ds.batch(batch_size)
 
     @staticmethod
-    def read_label_data(file_path, batch_size):
+    def read_label_data(file_path, batch_size, parallelism=None, index=None):
         def multiply_split(value):
             tmp = tf.strings.to_number(tf.sparse.to_dense(tf.string_split([value], sep=',')), tf.int32)
             return tf.squeeze(tmp)
@@ -163,11 +168,20 @@ class Sample(object):
                                     record_defaults=[0, 0, '0,0,0,0,0,0', 0, '0,0,0,0,0,0', 0, 0], field_delim=' ')
             return columns[0], columns[1], multiply_split(columns[2]), columns[3], multiply_split(columns[4]), columns[
                 5], columns[6]
+
         if isinstance(file_path, list):
             files = file_path
         else:
             files = [file_path]
-        ds = tf.data.TextLineDataset(filenames=[files])
+
+        logger.info("{} all files: {}".format(index, files))
+        if parallelism is not None and index is not None:
+            partitioned_files = files[index::parallelism]
+        else:
+            partitioned_files = files
+
+        logger.info("index: {} read files: {}".format(index, partitioned_files))
+        ds = tf.data.TextLineDataset(filenames=[partitioned_files])
         ds = ds.map(parse_csv)
         ds = ds.repeat(-1)
         return ds.batch(batch_size)
