@@ -14,21 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import ai_flow as af
-from color_processor.validate_processor import BatchValidateProcessor
-
-
-def workflow():
-    af.init_ai_flow_context()
-    with af.job_config(job_name='batch_validate'):
-        af.user_define_operation(input=None, processor=BatchValidateProcessor())
-
-    # Run workflow
-    af.workflow_operation.stop_all_workflow_executions(af.current_workflow_config().workflow_name)
-    af.workflow_operation.submit_workflow(af.current_workflow_config().workflow_name)
-    workflow_execution = af.workflow_operation.start_new_workflow_execution(af.current_workflow_config().workflow_name)
-    print(workflow_execution)
-
-
-if __name__ == '__main__':
-    workflow()
