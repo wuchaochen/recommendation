@@ -105,4 +105,9 @@ class KafkaUtils(object):
 
 if __name__ == '__main__':
     kafka_util = KafkaUtils()
-    kafka_util.read_data(topic='raw_input', count=100000)
+    # kafka_util.read_data(topic='raw_input', count=100000)
+    from recommendation import config
+    kafka_util.send_data_loop(file_path=config.ValidateFilePath,
+                              topic_name=config.SampleQueueName,
+                              max_epoch=1,
+                              interval=0.1)

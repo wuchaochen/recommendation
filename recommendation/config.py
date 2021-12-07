@@ -17,6 +17,7 @@
 import os
 from recommendation import kafka_utils
 
+
 KafkaConn = 'localhost:9092'
 RawQueueName = 'raw_input'
 SampleQueueName = 'sample_input'
@@ -24,9 +25,17 @@ DbConn = 'mysql://root:chen@localhost:3306/user_info'
 ModelDir = '/tmp/model'
 BaseModelDir = ModelDir + '/base'
 TrainModelDir = ModelDir + '/train'
+BatchModelDir = TrainModelDir + '/batch'
+StreamModelDir = TrainModelDir + '/stream'
 DataDir = '/tmp/data'
 UserDictFile = DataDir + '/users.csv'
 SampleFileDir = DataDir + '/samples'
+ValidateFileDir = DataDir + '/validate'
+ValidateFilePath = ValidateFileDir + '/train_sample_1.csv'
+BatchModelName = 'batch_color_model'
+StreamModelName = 'stream_color_model'
+BatchACC = 'batch_acc'
+StreamACC = 'stream_acc'
 
 
 def init():

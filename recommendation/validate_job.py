@@ -46,6 +46,7 @@ def run_validate(input_func, batch_size, checkpoint_dir):
             = mon_sess.run([acc, loss, global_step])
 
         print("Step %d, loss: %f accuracy: %f" % (global_step_res, loss_res, acc_res))
+        return acc_res
 
 
 class ValidateJob(object):
@@ -54,7 +55,7 @@ class ValidateJob(object):
         def file_input_func(batch_size):
             dataset = Sample.read_label_data(file_path=validate_files, batch_size=batch_size)
             return dataset
-        run_validate(input_func=file_input_func, checkpoint_dir=checkpoint_dir, batch_size=data_count)
+        return run_validate(input_func=file_input_func, checkpoint_dir=checkpoint_dir, batch_size=data_count)
 
     @staticmethod
     def stream_validate(checkpoint_dir, topic, data_count):
@@ -70,20 +71,20 @@ class ValidateJob(object):
                        columns[5], columns[6]
 
             kafka_utils = KafkaUtils()
-            val_data = kafka_utils.read_data(topic=topic, count=batch_size)
+            val_data = kafka_utils.read_data(topic=topic, count=batch_size, offset='latest')
             dataset = tf.data.Dataset.from_tensor_slices(val_data)
             dataset = dataset.map(parse_csv)
             dataset = dataset.batch(batch_size)
             return dataset
 
-        run_validate(input_func=kafka_input_func, checkpoint_dir=checkpoint_dir, batch_size=data_count)
+        return run_validate(input_func=kafka_input_func, checkpoint_dir=checkpoint_dir, batch_size=data_count)
 
 
 if __name__ == '__main__':
 
-    ValidateJob.batch_validate(checkpoint_dir='/tmp/model/batch/v1',
-                               data_count=1000,
-                               validate_files=os.path.dirname(__file__) + '/../data/train_sample_2.csv')
-    # ValidateJob.stream_validate(checkpoint_dir='/tmp/model/stream/v1',
-    #                             data_count=1000,
-    #                             topic='raw_input')
+    # ValidateJob.batch_validate(checkpoint_dir='/tmp/model/batch/v1',
+    #                            data_count=1000,
+    #                            validate_files=os.path.dirname(__file__) + '/../data/train_sample_2.csv')
+    ValidateJob.stream_validate(checkpoint_dir='/tmp/model/train/stream/v1',
+                                data_count=10,
+                                topic='sample_input')

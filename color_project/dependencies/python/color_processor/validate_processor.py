@@ -14,12 +14,49 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import time
 from typing import List
-
+import ai_flow as af
 from ai_flow_plugins.job_plugins import python
 from ai_flow_plugins.job_plugins.python.python_processor import ExecutionContext
+from recommendation.validate_job import ValidateJob
+from recommendation import config
 
 
 class BatchValidateProcessor(python.PythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List) -> List:
-        print('hello world!')
+        validate_job = ValidateJob()
+        m_version = af.get_latest_generated_model_version(config.BatchModelName)
+        acc = validate_job.batch_validate(checkpoint_dir=m_version.model_path,
+                                          validate_files=config.ValidateFilePath,
+                                          data_count=10000)
+        af.register_metric_summary(metric_name=config.BatchACC,
+                                   metric_key='acc',
+                                   metric_value=str(acc),
+                                   metric_timestamp=int(time.time()))
+        af.update_model_version(model_name=config.BatchModelName,
+                                model_version=m_version.version,
+                                current_stage=af.ModelVersionStage.DEPLOYED)
+        return []
+
+
+class StreamValidateProcessor(python.PythonProcessor):
+    def process(self, execution_context: ExecutionContext, input_list: List) -> List:
+        validate_job = ValidateJob()
+        m_version = af.get_latest_generated_model_version(config.StreamModelName)
+        acc = validate_job.stream_validate(checkpoint_dir=m_version.model_path,
+                                           topic=config.SampleQueueName,
+                                           data_count=10000)
+        af.register_metric_summary(metric_name=config.StreamACC,
+                                   metric_key='acc',
+                                   metric_value=str(acc),
+                                   metric_timestamp=int(time.time()))
+        if acc > 0.3:
+            af.update_model_version(model_name=config.StreamModelName,
+                                    model_version=m_version.version,
+                                    current_stage=af.ModelVersionStage.DEPLOYED)
+        else:
+            af.update_model_version(model_name=config.StreamModelName,
+                                    model_version=m_version.version,
+                                    current_stage=af.ModelVersionStage.DEPRECATED)
+        return []
