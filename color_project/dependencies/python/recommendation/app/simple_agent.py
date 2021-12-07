@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
-from recommendation import kafka_utils
+from recommendation import kafka_utils, config
 
 
 class SimpleAgent(object):
@@ -49,11 +49,11 @@ class SimpleAgent(object):
 
 
 if __name__ == '__main__':
-    data_dir = os.path.join(os.path.dirname(__file__), '../../data/')
-    agent = SimpleAgent(topic_name='raw_input',
-                        sample_data_1=data_dir + 'train_sample_2.csv',
+    data_dir = os.path.join(os.path.dirname(__file__), '../../../../../data/')
+    agent = SimpleAgent(topic_name=config.SampleQueueName,
+                        sample_data_1=data_dir + 'train_sample_1.csv',
                         epoch_1=100,
-                        sample_data_2=data_dir + 'train_sample_2.csv',
+                        sample_data_2=data_dir + 'train_sample_1.csv',
                         epoch_2=0,
                         interval=0.1)
     agent.send_data_to_raw_input()

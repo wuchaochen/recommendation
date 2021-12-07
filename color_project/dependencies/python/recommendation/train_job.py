@@ -25,17 +25,18 @@ from flink_ml_tensorflow.tensorflow_on_flink_mlconf import MLCONSTANTS
 from pyflink.datastream.stream_execution_environment import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment, DataTypes
 
-from recommendation.config import SampleFileDir, BaseModelDir, TrainModelDir
+from recommendation import config
+from recommendation.config import SampleFileDir, TrainModelDir, BatchModelDir
 
 
 class TrainJob(object):
     @staticmethod
-    def batch_train():
+    def batch_train(base_model_save_dir, sample_dir, max_step=2000):
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
         statement_set = table_env.create_statement_set()
 
-        sample_files = glob.glob(os.path.join(SampleFileDir, "*"))
+        sample_files = glob.glob(os.path.join(sample_dir, "*"))
 
         work_num = 2
         ps_num = 1
@@ -47,8 +48,10 @@ class TrainJob(object):
                 MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
                 MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
                 'checkpoint_dir': '/tmp/model/batch',
-                'model_save_path': BaseModelDir,
-        'input_files': ",".join(sample_files)}
+                'model_save_path': base_model_save_dir,
+                'max_step': str(max_step),
+                'batch_model_name': config.BatchModelName,
+                'input_files': ",".join(sample_files)}
         env_path = None
 
         tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
@@ -60,20 +63,20 @@ class TrainJob(object):
         model.statement_set.execute().wait()
 
     @staticmethod
-    def stream_train():
+    def stream_train(base_model_checkpoint_dir, stream_model_dir, kafka_broker, topic):
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
         statement_set = table_env.create_statement_set()
 
         def input_table():
-            table_env.execute_sql('''
+            table_env.execute_sql(f'''
                         create table raw_input (
                             record varchar
                         ) with (
                             'connector' = 'kafka',
-                            'topic' = 'raw_input',
-                            'properties.bootstrap.servers' = 'localhost:9092',
-                            'properties.group.id' = 'raw_input',
+                            'topic' = '{topic}',
+                            'properties.bootstrap.servers' = '{kafka_broker}',
+                            'properties.group.id' = '{topic}',
                             'format' = 'csv',
                             'csv.field-delimiter' = '|',
                             'scan.startup.mode' = 'earliest-offset'
@@ -94,9 +97,10 @@ class TrainJob(object):
                 MLCONSTANTS.DECODING_CLASS: 'com.alibaba.flink.ml.operator.coding.RowCSVCoding',
                 "sys:csv_encode_types": 'STRING',
                 "sys:csv_decode_types": 'STRING',
+                'stream_model_name': config.StreamModelName,
                 'checkpoint_dir': '/tmp/model/stream/v1',
-                'base_model_checkpoint': '/tmp/model/base/1638868547.9872699/',
-                'model_save_path': TrainModelDir}
+                'base_model_checkpoint': base_model_checkpoint_dir,
+                'model_save_path': stream_model_dir}
 
         env_path = None
 
@@ -120,6 +124,6 @@ if __name__ == '__main__':
         shutil.rmtree('temp')
     subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
 
-    TrainJob.batch_train()
+    # TrainJob.batch_train(BatchModelDir, SampleFileDir)
 
-    # TrainJob.stream_train()
+    # TrainJob.stream_train('/tmp/model/train/batch/1638894961.2195241', config.StreamModelDir, "localhost:9092", "sample_input")

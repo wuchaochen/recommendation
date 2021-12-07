@@ -20,6 +20,7 @@ import shutil
 import sys
 import time
 
+import ai_flow as af
 import tensorflow as tf
 from flink_ml_tensorflow.tensorflow_context import TFContext
 
@@ -34,29 +35,38 @@ class CheckpointSaver(tf.train.CheckpointSaverListener):
         self.checkpoint_dir = checkpoint_dir
         self.target_dir = target_dir
 
-    def copy_checkpoint(self):
+    def copy_checkpoint(self) -> str:
         target = os.path.join(self.target_dir, str(time.time()))
         logger.info("Copying model checkpoint from {} to {}".format(self.checkpoint_dir, target))
         shutil.copytree(self.checkpoint_dir, target)
         logger.info("Checkpoint copy completed")
+        return target
 
 
 class StreamCheckpointSaver(CheckpointSaver):
 
-    def __init__(self, checkpoint_dir, target_dir):
+    def __init__(self, checkpoint_dir, target_dir, stream_model_name):
         super().__init__(checkpoint_dir, target_dir)
+        self.stream_model_name = stream_model_name
 
     def after_save(self, session, global_step_value):
-        self.copy_checkpoint()
+        target = self.copy_checkpoint()
+        af.init_ai_flow_client("localhost:50051", "color_project", notification_server_uri="localhost:50052")
+        model_meta = af.get_model_by_name(self.stream_model_name)
+        af.register_model_version(model_meta, target)
 
 
 class BatchCheckpointSaver(CheckpointSaver):
 
-    def __init__(self, checkpoint_dir, target_dir):
+    def __init__(self, checkpoint_dir, target_dir, batch_model_name):
         super().__init__(checkpoint_dir, target_dir)
+        self.batch_model_name = batch_model_name
 
     def end(self, session, global_step_value):
-        self.copy_checkpoint()
+        target = self.copy_checkpoint()
+        af.init_ai_flow_client("localhost:50051", "color_project", notification_server_uri="localhost:50052")
+        model_meta = af.get_model_by_name(self.batch_model_name)
+        af.register_model_version(model_meta, target)
 
 
 class ModelTrainer(object):
@@ -138,7 +148,8 @@ def stream_train(context):
     checkpoint_dir = tf_context.properties['checkpoint_dir']
     base_model_checkpoint = tf_context.properties['base_model_checkpoint']
     model_save_path = tf_context.properties['model_save_path']
-    checkpoint_saver = StreamCheckpointSaver(checkpoint_dir, model_save_path)
+    stream_model_name = tf_context.properties['stream_model_name']
+    checkpoint_saver = StreamCheckpointSaver(checkpoint_dir, model_save_path, stream_model_name)
     checkpoint_saver_hook = tf.train.CheckpointSaverHook(checkpoint_dir,
                                                          save_steps=None,
                                                          save_secs=60,
@@ -169,14 +180,16 @@ def batch_train(context):
 
     checkpoint_dir = tf_context.properties['checkpoint_dir']
     model_save_path = tf_context.properties['model_save_path']
-    checkpoint_saver = BatchCheckpointSaver(checkpoint_dir, model_save_path)
+    max_step = int(tf_context.properties['max_step'])
+    batch_model_name = tf_context.properties['batch_model_name']
+    checkpoint_saver = BatchCheckpointSaver(checkpoint_dir, model_save_path, batch_model_name)
     checkpoint_saver_hook = tf.train.CheckpointSaverHook(checkpoint_dir,
                                                          save_steps=None,
                                                          save_secs=30,
                                                          listeners=[checkpoint_saver])
 
     trainer = ModelTrainer(tf_context=tf_context,
-                           hooks=[tf.train.StopAtStepHook(last_step=2050)],
+                           hooks=[tf.train.StopAtStepHook(last_step=max_step)],
                            batch_size=batch_size,
                            chief_only_hooks=[checkpoint_saver_hook])
     trainer.train(input_func=file_input_func)
