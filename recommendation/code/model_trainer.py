@@ -31,7 +31,7 @@ class ModelTrainer(object):
         index = self.tf_context.get_index()
         cluster_json = self.tf_context.get_tf_cluster()
         print(cluster_json)
-        checkpoint_dir = self.tf_context.properties['checkpoint_dir']
+        checkpoint_dir = self.tf_context.properties['model_save_path']
         sys.stdout.flush()
         cluster = tf.train.ClusterSpec(cluster=cluster_json)
         server = tf.train.Server(cluster, job_name=job_name, task_index=index)

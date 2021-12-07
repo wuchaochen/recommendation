@@ -15,14 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
-import subprocess
 import shutil
-from pyflink.datastream.stream_execution_environment import StreamExecutionEnvironment
-from pyflink.table import StreamTableEnvironment
+import subprocess
 
 from flink_ml_tensorflow.tensorflow_TFConfig import TFConfig
-from flink_ml_tensorflow.tensorflow_on_flink_table import train
+from flink_ml_tensorflow.tensorflow_on_flink_ml import Tensorflow
 from flink_ml_tensorflow.tensorflow_on_flink_mlconf import MLCONSTANTS
+from pyflink.datastream.stream_execution_environment import StreamExecutionEnvironment
+from pyflink.table import StreamTableEnvironment, DataTypes
 
 
 class TrainJob(object):
@@ -30,7 +30,6 @@ class TrainJob(object):
     def batch_train():
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
-        statement_set = table_env.create_statement_set()
 
         work_num = 2
         ps_num = 1
@@ -41,26 +40,20 @@ class TrainJob(object):
                 MLCONSTANTS.CONFIG_STORAGE_TYPE: MLCONSTANTS.STORAGE_ZOOKEEPER,
                 MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
                 MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
-                'checkpoint_dir': '/tmp/model/batch/v1',
                 'input_files': os.path.dirname(__file__) + '/../data/train_sample_2.csv'}
         env_path = None
 
-        input_tb = None
-        output_schema = None
-
         tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
 
-        train(stream_env, table_env, statement_set, input_tb, tf_config, output_schema)
-
-        job_client = statement_set.execute().get_job_client()
-        if job_client is not None:
-            job_client.get_job_execution_result().result()
+        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()])
+        model = tensorflow.fit(table_env=table_env)
+        model.save("/tmp/model/batch/v1")
+        model.statement_set.execute().wait()
 
     @staticmethod
     def stream_train():
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
-        statement_set = table_env.create_statement_set()
 
         def input_table():
             table_env.execute_sql('''
@@ -96,15 +89,13 @@ class TrainJob(object):
         env_path = None
 
         input_tb = input_table()
-        output_schema = None
 
         tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
 
-        train(stream_env, table_env, statement_set, input_tb, tf_config, output_schema)
-
-        job_client = statement_set.execute().get_job_client()
-        if job_client is not None:
-            job_client.get_job_execution_result().result()
+        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()])
+        model = tensorflow.fit(input_tb)
+        model.save("/tmp/model/stream/v1")
+        model.statement_set.execute().wait()
 
 
 if __name__ == '__main__':
