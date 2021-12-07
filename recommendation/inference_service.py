@@ -21,6 +21,10 @@ import time
 from concurrent import futures
 import grpc
 import tensorflow as tf
+from notification_service.base_notification import EventWatcher, BaseEvent
+from notification_service.client import NotificationClient
+from typing import List
+
 from recommendation.data import SampleData, ColourData
 from recommendation.code.r_model import RecommendationModel
 from recommendation.proto.service_pb2 import RecordRequest, RecordResponse
@@ -34,6 +38,7 @@ threshold = 0.3
 class ModelInference(object):
     def __init__(self, checkpoint_dir):
         self.checkpoint_dir = checkpoint_dir
+        tf.reset_default_graph()
         m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
         record = tf.placeholder(dtype=tf.string, name='record', shape=[None])
 
@@ -58,6 +63,7 @@ class ModelInference(object):
         self.top_indices, self.top_values = m.output(last_layer)
         self.top_1_indices, self.top_1_values = m.top_one_output(last_layer)
         global_step = tf.train.get_or_create_global_step()
+        print('load checkpoint {}'.format(checkpoint_dir))
         self.mon_sess = tf.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir)
 
     def inference(self, record):
@@ -90,14 +96,32 @@ class ModelInference(object):
         self.mon_sess.close()
 
 
+class DeployModel(EventWatcher):
+    def __init__(self, util):
+        self.util = util
+
+    def process(self, events: List[BaseEvent]):
+        event = events[0]
+        try:
+            print(event.value)
+            self.util.lock.acquire()
+            self.util.checkpoint_dir = event.value
+            self.util.init_model()
+        finally:
+            self.util.lock.release()
+
+
 class InferenceUtil(object):
     def __init__(self, checkpoint_dir):
         self.user_dict = SampleData.load_user_dict()
-        self.queue = queue.Queue(maxsize=500)
         self.colour_data = ColourData(count=128, select_count=6)
         self.checkpoint_dir = checkpoint_dir
         self.mi = None
         self.agent_client = None
+        self.ns_client = NotificationClient(server_uri='localhost:50052')
+        self.ns_client.start_listen_event(key='image_model', watcher=DeployModel(self), event_type='Deployed',
+                                          start_time=int(time.time() * 1000))
+        self.lock = threading.Lock()
 
     def random_click_record(self):
         c1, c2 = self.colour_data.random_colours()
@@ -158,7 +182,11 @@ class InferenceUtil(object):
         return ' '.join(map(lambda x: str(x), record))
 
     def inference(self, features):
-        return self.mi.inference(features)
+        try:
+            self.lock.acquire()
+            return self.mi.inference(features)
+        finally:
+            self.lock.release()
 
     def update_state(self, uid, inference_result, click_result):
         db.update_user_click_info(uid=uid, fs=inference_result + ' ' + str(click_result))

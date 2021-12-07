@@ -60,7 +60,7 @@ class DataProcessor(object):
                         'properties.group.id' = 'raw_input',
                         'format' = 'csv',
                         'csv.field-delimiter' = ' ',
-                        'scan.startup.mode' = 'earliest-offset'
+                        'scan.startup.mode' = 'latest-offset'
                     )
                 ''')
         t_env.execute_sql('''

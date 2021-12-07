@@ -99,13 +99,15 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = "user"
-    uid = Column(Integer(), primary_key=True)
+    id = Column(Integer(), primary_key=True)
+    uid = Column(Integer(), nullable=False)
     country = Column(Integer, nullable=False)
 
 
 class UserClick(Base):
     __tablename__ = "user_click"
-    uid = Column(Integer(), primary_key=True)
+    id = Column(Integer(), primary_key=True)
+    uid = Column(Integer(), nullable=False)
     fs_1 = Column(String(1024), nullable=False)
     fs_2 = Column(String(1024), nullable=False)
 
