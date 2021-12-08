@@ -1,5 +1,7 @@
 data_process:
-  job_type: python
+  job_type: flink
+  properties:
+    run_mode: local
 
 batch_train:
   job_type: python

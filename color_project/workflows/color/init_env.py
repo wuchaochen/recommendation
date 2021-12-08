@@ -27,6 +27,7 @@ def get_project_path():
 
 
 def init():
+    af.register_dataset(name=config.RawQueueName, uri="{},{}".format(config.KafkaConn, config.RawQueueName))
     af.register_dataset(name=config.SampleFileName, uri=config.SampleFileDir)
     af.register_dataset(name=config.SampleQueueName, uri="{},{}".format(config.KafkaConn, config.SampleQueueName))
 
