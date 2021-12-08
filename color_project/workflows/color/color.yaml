@@ -4,10 +4,14 @@ data_process:
     run_mode: local
 
 batch_train:
-  job_type: python
+  job_type: flink
+  properties:
+    run_mode: local
 
 stream_train:
-  job_type: python
+  job_type: flink
+  properties:
+    run_mode: local
 
 batch_validate:
   job_type: python
