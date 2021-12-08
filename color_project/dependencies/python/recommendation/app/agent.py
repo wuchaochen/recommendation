@@ -93,7 +93,7 @@ class Agent(object):
     def action(self):
         client = InferenceClient('localhost:30002')
         count = 0
-        start_time = int(time.time())
+        start_time = time.monotonic()
         while True:
             count += 1
             uid = str(self.request())
@@ -106,7 +106,7 @@ class Agent(object):
             self.write_log(uid=uid, inference_result=res, click_result=click_result)
             time.sleep(self.interval)
             if count % 1000 == 0:
-                end_time = int(time.time())
+                end_time = time.monotonic()
                 print('{} records/sec'.format(1000/(end_time-start_time)))
                 start_time = end_time
 
@@ -149,6 +149,6 @@ class AgentServer(object):
 
 
 if __name__ == '__main__':
-    agent_model_dir = '/tmp/model/2'
-    as_ = AgentServer(agent_model_dir, interval=0.0)
+    agent_model_dir = config.AgentModelDir
+    as_ = AgentServer(agent_model_dir, interval=0)
     as_.start()

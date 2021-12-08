@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import json
 import queue
 import random
 import threading
@@ -104,8 +105,9 @@ class DeployModel(EventWatcher):
         event = events[0]
         try:
             print(event.value)
+            model_path = json.loads(event.value)["_model_path"]
             self.util.lock.acquire()
-            self.util.checkpoint_dir = event.value
+            self.util.checkpoint_dir = model_path
             self.util.init_model()
         finally:
             self.util.lock.release()
@@ -119,7 +121,8 @@ class InferenceUtil(object):
         self.mi = None
         self.agent_client = None
         self.ns_client = NotificationClient(server_uri='localhost:50052')
-        self.ns_client.start_listen_event(key=config.StreamModelName, watcher=DeployModel(self), event_type='Deployed',
+        self.ns_client.start_listen_event(key=config.StreamModelName, watcher=DeployModel(self),
+                                          event_type='MODEL_DEPLOYED',
                                           start_time=int(time.time() * 1000))
         self.lock = threading.Lock()
 
@@ -230,7 +233,7 @@ class InferenceServer(object):
 
 
 if __name__ == '__main__':
-    inference_model_dir = '/tmp/model/2'
+    inference_model_dir = config.InferenceModelDir
 
     # inference_util = InferenceUtil(inference_model_dir)
     # inference_util.init_user_cache()

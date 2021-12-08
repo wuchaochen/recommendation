@@ -34,6 +34,13 @@ class CheckpointSaver(tf.train.CheckpointSaverListener):
     def __init__(self, checkpoint_dir, target_dir):
         self.checkpoint_dir = checkpoint_dir
         self.target_dir = target_dir
+        while True:
+            try:
+                af.init_ai_flow_client("localhost:50051", "color_project", notification_server_uri="localhost:50052")
+                self.ai_flow_client = af.get_ai_flow_client()
+                break
+            except Exception:
+                pass
 
     def copy_checkpoint(self) -> str:
         target = os.path.join(self.target_dir, str(time.time()))
@@ -51,9 +58,8 @@ class StreamCheckpointSaver(CheckpointSaver):
 
     def after_save(self, session, global_step_value):
         target = self.copy_checkpoint()
-        af.init_ai_flow_client("localhost:50051", "color_project", notification_server_uri="localhost:50052")
-        model_meta = af.get_model_by_name(self.stream_model_name)
-        af.register_model_version(model_meta, target)
+        model_meta = self.ai_flow_client.get_model_by_name(self.stream_model_name)
+        self.ai_flow_client.register_model_version(model_meta, target)
 
 
 class BatchCheckpointSaver(CheckpointSaver):
@@ -64,9 +70,8 @@ class BatchCheckpointSaver(CheckpointSaver):
 
     def end(self, session, global_step_value):
         target = self.copy_checkpoint()
-        af.init_ai_flow_client("localhost:50051", "color_project", notification_server_uri="localhost:50052")
-        model_meta = af.get_model_by_name(self.batch_model_name)
-        af.register_model_version(model_meta, target)
+        model_meta = self.ai_flow_client.get_model_by_name(self.batch_model_name)
+        self.ai_flow_client.register_model_version(model_meta, target)
 
 
 class ModelTrainer(object):
@@ -76,6 +81,7 @@ class ModelTrainer(object):
         self.batch_size = batch_size
         self.chief_only_hooks = chief_only_hooks if chief_only_hooks else []
         self.base_model_checkpoint = base_model_checkpoint
+        logger.info("ModelTrainer: {}".format(self.__dict__))
 
     def train(self, input_func):
         job_name = self.tf_context.get_role_name()

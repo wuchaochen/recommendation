@@ -51,7 +51,7 @@ class StreamValidateProcessor(python.PythonProcessor):
         m_version = af.get_latest_generated_model_version(config.StreamModelName)
         acc = validate_job.stream_validate(checkpoint_dir=m_version.model_path,
                                            topic=config.SampleQueueName,
-                                           data_count=10000)
+                                           data_count=1000)
         af.register_metric_summary(metric_name=config.StreamACC,
                                    metric_key='acc',
                                    metric_value=str(acc),
