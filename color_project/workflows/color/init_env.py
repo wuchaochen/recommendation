@@ -30,6 +30,9 @@ def init():
     af.register_dataset(name=config.RawQueueName, uri="{},{}".format(config.KafkaConn, config.RawQueueName))
     af.register_dataset(name=config.SampleFileName, uri=config.SampleFileDir)
     af.register_dataset(name=config.SampleQueueName, uri="{},{}".format(config.KafkaConn, config.SampleQueueName))
+    af.register_dataset(name=config.ValidateDataset, uri=config.ValidateFilePath)
+    af.register_dataset(name=config.UserProfileDataset, uri=config.UserProfileTableName)
+    af.register_dataset(name=config.UserClickDataset, uri=config.UserClickTableName)
 
     af.register_metric_meta(metric_name=config.BatchACC,
                             metric_type=af.MetricType.MODEL,
@@ -41,15 +44,6 @@ def init():
 
     af.register_model(model_name=config.BatchModelName)
     af.register_model(model_name=config.StreamModelName)
-
-    #
-    # af.register_model_version(model=config.BatchModelName,
-    #                           model_path=config.BatchModelDir + '/1',
-    #                           current_stage=af.ModelVersionStage.GENERATED)
-    #
-    # af.register_model_version(model=config.StreamModelName,
-    #                           model_path=config.StreamModelDir + '/1',
-    #                           current_stage=af.ModelVersionStage.GENERATED)
 
 
 if __name__ == '__main__':

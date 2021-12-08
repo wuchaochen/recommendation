@@ -15,21 +15,30 @@
 # specific language governing permissions and limitations
 # under the License.
 import time
-from typing import List
+
 import ai_flow as af
 from ai_flow_plugins.job_plugins import python
 from ai_flow_plugins.job_plugins.python.python_processor import ExecutionContext
-from recommendation.validate_job import ValidateJob
+from typing import List
+
 from recommendation import config
+from recommendation.validate_job import ValidateJob
+
+
+class ValidateDataReader(python.PythonProcessor):
+
+    def process(self, execution_context: ExecutionContext, input_list: List) -> List:
+        return [execution_context.config.get('dataset')]
 
 
 class BatchValidateProcessor(python.PythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List) -> List:
         validate_job = ValidateJob()
+        dataset = input_list[0]
         m_version = af.get_latest_generated_model_version(config.BatchModelName)
         deployed_version = af.get_deployed_model_version(config.BatchModelName)
         acc = validate_job.batch_validate(checkpoint_dir=m_version.model_path,
-                                          validate_files=config.ValidateFilePath,
+                                          validate_files=dataset.uri,
                                           data_count=10000)
         af.register_metric_summary(metric_name=config.BatchACC,
                                    metric_key='acc',
@@ -48,9 +57,11 @@ class BatchValidateProcessor(python.PythonProcessor):
 class StreamValidateProcessor(python.PythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List) -> List:
         validate_job = ValidateJob()
+        broker, topic = input_list[0].uri.split(",")
         m_version = af.get_latest_generated_model_version(config.StreamModelName)
         acc = validate_job.stream_validate(checkpoint_dir=m_version.model_path,
-                                           topic=config.SampleQueueName,
+                                           broker=broker,
+                                           topic=topic,
                                            data_count=1000)
         af.register_metric_summary(metric_name=config.StreamACC,
                                    metric_key='acc',
