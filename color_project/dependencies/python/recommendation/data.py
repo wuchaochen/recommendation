@@ -26,8 +26,8 @@ from recommendation import config
 
 threshold = 0.3
 
-data_dir = os.path.dirname(__file__) + '/../data/'
-base_model_dir = os.path.dirname(__file__) + '/../models/base/'
+data_dir = os.path.dirname(__file__) + '/../../data/'
+base_model_dir = os.path.dirname(__file__) + '/../../models/base/'
 
 
 def random_item(size):

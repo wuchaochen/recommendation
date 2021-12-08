@@ -71,7 +71,6 @@ class Agent(object):
             self.lock.release()
 
     def write_log(self, uid, inference_result, click_result):
-        print(uid, inference_result, click_result)
         self.producer.send(topic=self.topic, value=bytes(str(uid) + ' ' + inference_result + ' ' + str(click_result),
                                                          encoding='utf8'))
 
@@ -93,7 +92,10 @@ class Agent(object):
 
     def action(self):
         client = InferenceClient('localhost:30002')
+        count = 0
+        start_time = int(time.time())
         while True:
+            count += 1
             uid = str(self.request())
             res = client.inference(uid)
             colors = set(map(int, res.split(',')))
@@ -103,6 +105,10 @@ class Agent(object):
                 click_result = -1
             self.write_log(uid=uid, inference_result=res, click_result=click_result)
             time.sleep(self.interval)
+            if count % 1000 == 0:
+                end_time = int(time.time())
+                print('{} records/sec'.format(1000/(end_time-start_time)))
+                start_time = end_time
 
     def start(self):
         thread = threading.Thread(target=self.action, args=())
@@ -143,6 +149,6 @@ class AgentServer(object):
 
 
 if __name__ == '__main__':
-    agent_model_dir = '/tmp/model/1'
-    as_ = AgentServer(agent_model_dir, interval=0.1)
+    agent_model_dir = '/tmp/model/2'
+    as_ = AgentServer(agent_model_dir, interval=0.0)
     as_.start()

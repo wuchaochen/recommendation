@@ -33,7 +33,7 @@ from recommendation.app.agent_client import AgentClient
 from recommendation import db
 from recommendation import config
 
-threshold = 0.3
+threshold = 0.1
 
 
 class ModelInference(object):
@@ -77,14 +77,19 @@ class ModelInference(object):
         return results
 
     def inference_click(self, record):
-        print(record)
         indices_res, values_res = self.mon_sess.run([self.top_1_indices, self.top_1_values], feed_dict={'record:0': record})
         results = []
         if isinstance(indices_res, list):
             for i in range(len(indices_res)):
-                results.append(indices_res[i])
+                if values_res[i] > threshold:
+                    results.append(indices_res[i])
+                else:
+                    results.append(-1)
         else:
-            results.append(indices_res)
+            if values_res > threshold:
+                results.append(indices_res)
+            else:
+                results.append(-1)
         return results
 
     def close(self):
@@ -114,7 +119,7 @@ class InferenceUtil(object):
         self.mi = None
         self.agent_client = None
         self.ns_client = NotificationClient(server_uri='localhost:50052')
-        self.ns_client.start_listen_event(key='image_model', watcher=DeployModel(self), event_type='Deployed',
+        self.ns_client.start_listen_event(key=config.StreamModelName, watcher=DeployModel(self), event_type='Deployed',
                                           start_time=int(time.time() * 1000))
         self.lock = threading.Lock()
 

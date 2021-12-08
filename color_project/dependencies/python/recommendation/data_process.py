@@ -20,8 +20,6 @@ from pyflink.table.udf import udf
 from recommendation import db
 from recommendation import config
 
-data_dir = os.path.join(os.path.dirname(__file__), '../data/')
-
 
 class BuildFeature(ScalarFunction):
 
@@ -32,7 +30,6 @@ class BuildFeature(ScalarFunction):
         db.init_db(uri=config.DbConn)
 
     def eval(self, uid, country, infer, click, f1, f2):
-        print(uid)
         db.update_user_click_info(uid=uid, fs=infer + ' ' + str(click))
         return ' '.join([str(uid), str(country), f1, f2, str(click)])
 
@@ -78,8 +75,7 @@ class DataProcessor(object):
                         'connector' = 'kafka',
                         'topic' = 'sample_input',
                         'properties.bootstrap.servers' = 'localhost:9092',
-                        'format' = 'csv',
-                        'csv.field-delimiter' = '|'
+                        'format' = 'raw'
                     )
                 ''')
         t_env.execute_sql('''
