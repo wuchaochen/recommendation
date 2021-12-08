@@ -15,21 +15,43 @@
 # specific language governing permissions and limitations
 # under the License.
 import ai_flow as af
+
+from color_processor.train_procssor import BatchTrainDataReader, BatchTrainProcessor, StreamTrainProcessor
 from color_processor.validate_processor import BatchValidateProcessor, StreamValidateProcessor
 from color_processor.sample_processor import SampleProcessor
+from recommendation import config
 
 
 def workflow():
     af.init_ai_flow_context()
+    with af.job_config(job_name='batch_train'):
+        batch_train_sample_meta = af.get_dataset_by_name(config.SampleFileName)
+        base_model_meta = af.get_model_by_name(config.BatchModelName)
+        assert batch_train_sample_meta is not None
+        data = af.read_dataset(batch_train_sample_meta, read_dataset_processor=BatchTrainDataReader())
+        af.train(data, model_info=base_model_meta, training_processor=BatchTrainProcessor(200))
+
     with af.job_config(job_name='batch_validate'):
         af.user_define_operation(input=None, processor=BatchValidateProcessor())
 
+    with af.job_config(job_name='stream_train'):
+        stream_train_sample_meta = af.get_dataset_by_name(config.SampleQueueName)
+        base_model_meta = af.get_model_by_name(config.BatchModelName)
+        stream_model_meta = af.get_model_by_name(config.StreamModelName)
+        assert stream_train_sample_meta is not None
+        data = af.read_dataset(stream_train_sample_meta, read_dataset_processor=BatchTrainDataReader())
+        af.train(data, model_info=stream_model_meta, base_model_info=base_model_meta,
+                 training_processor=StreamTrainProcessor())
+
     with af.job_config(job_name='stream_validate'):
         af.user_define_operation(input=None, processor=StreamValidateProcessor())
+    #
+    # with af.job_config(job_name='data_process'):
+    #     af.user_define_operation(input=None, processor=SampleProcessor())
 
-    with af.job_config(job_name='data_process'):
-        af.user_define_operation(input=None, processor=SampleProcessor())
-
+    af.action_on_job_status("batch_validate", "batch_train")
+    af.action_on_model_version_event("stream_train", config.BatchModelName, 'MODEL_GENERATED')
+    af.action_on_model_version_event("stream_validate", config.StreamModelName, 'MODEL_GENERATED')
     # Run workflow
     af.workflow_operation.stop_all_workflow_executions(af.current_workflow_config().workflow_name)
     af.workflow_operation.submit_workflow(af.current_workflow_config().workflow_name)

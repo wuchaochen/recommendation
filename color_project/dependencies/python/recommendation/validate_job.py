@@ -41,7 +41,9 @@ def run_validate(input_func, batch_size, checkpoint_dir):
     tf.summary.scalar(name='loss', tensor=loss, family='train')
     global_step = tf.train.get_or_create_global_step()
     with tf.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir,
-                                           summary_dir=checkpoint_dir+'/validate') as mon_sess:
+                                           summary_dir=checkpoint_dir+'/validate',
+                                           save_checkpoint_secs=None,
+                                           save_checkpoint_steps=None) as mon_sess:
         acc_res, loss_res, global_step_res \
             = mon_sess.run([acc, loss, global_step])
 

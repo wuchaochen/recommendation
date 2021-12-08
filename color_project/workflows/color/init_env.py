@@ -27,6 +27,9 @@ def get_project_path():
 
 
 def init():
+    af.register_dataset(name=config.SampleFileName, uri=config.SampleFileDir)
+    af.register_dataset(name=config.SampleQueueName, uri="{},{}".format(config.KafkaConn, config.SampleQueueName))
+
     af.register_metric_meta(metric_name=config.BatchACC,
                             metric_type=af.MetricType.MODEL,
                             project_name=af.current_project_config().get_project_name())
@@ -38,13 +41,14 @@ def init():
     af.register_model(model_name=config.BatchModelName)
     af.register_model(model_name=config.StreamModelName)
 
-    af.register_model_version(model=config.BatchModelName,
-                              model_path=config.BatchModelDir + '/1',
-                              current_stage=af.ModelVersionStage.GENERATED)
-
-    af.register_model_version(model=config.StreamModelName,
-                              model_path=config.StreamModelDir + '/1',
-                              current_stage=af.ModelVersionStage.GENERATED)
+    #
+    # af.register_model_version(model=config.BatchModelName,
+    #                           model_path=config.BatchModelDir + '/1',
+    #                           current_stage=af.ModelVersionStage.GENERATED)
+    #
+    # af.register_model_version(model=config.StreamModelName,
+    #                           model_path=config.StreamModelDir + '/1',
+    #                           current_stage=af.ModelVersionStage.GENERATED)
 
 
 if __name__ == '__main__':
