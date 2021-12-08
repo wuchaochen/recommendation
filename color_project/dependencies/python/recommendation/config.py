@@ -21,7 +21,9 @@ from recommendation import kafka_utils
 KafkaConn = 'localhost:9092'
 RawQueueName = 'raw_input'
 SampleQueueName = 'sample_input'
-DbConn = 'mysql://root:chen@localhost:3306/user_info'
+DbUserName = 'root'
+DbPassword = 'root'
+DbConn = 'mysql://{}:{}@localhost:3306/user_info'.format(DbUserName, DbPassword)
 ModelDir = '/tmp/model'
 BaseModelDir = ModelDir + '/base'
 TrainModelDir = ModelDir + '/train'
@@ -37,6 +39,9 @@ BatchModelName = 'batch_color_model'
 StreamModelName = 'stream_color_model'
 BatchACC = 'batch_acc'
 StreamACC = 'stream_acc'
+
+AgentModelDir = '/tmp/model/1'
+InferenceModelDir = '/tmp/model/1'
 
 
 def init():

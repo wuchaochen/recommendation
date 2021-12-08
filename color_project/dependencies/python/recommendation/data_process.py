@@ -90,7 +90,7 @@ class DataProcessor(object):
                     )
                 '''.format(config.SampleFileDir))
 
-        t_env.execute_sql('''
+        t_env.execute_sql(f'''
                     create table user_c (
                         uid int,
                         country int
@@ -98,12 +98,12 @@ class DataProcessor(object):
                         'connector' = 'jdbc',
                         'url' = 'jdbc:mysql://localhost:3306/user_info',
                         'table-name' = 'user',
-                        'username' = 'root',
-                        'password' = 'chen'
+                        'username' = '{config.DbUserName}',
+                        'password' = '{config.DbPassword}'
                     )
                         ''')
 
-        t_env.execute_sql('''
+        t_env.execute_sql(f'''
                     create table user_click (
                         uid int,
                         fs_1 varchar,
@@ -112,8 +112,8 @@ class DataProcessor(object):
                         'connector' = 'jdbc',
                         'url' = 'jdbc:mysql://localhost:3306/user_info',
                         'table-name' = 'user_click',
-                        'username' = 'root',
-                        'password' = 'chen'
+                        'username' = '{config.DbUserName}',
+                        'password' = '{config.DbPassword}'
                     )
                         ''')
         result = t_env.sql_query('''
