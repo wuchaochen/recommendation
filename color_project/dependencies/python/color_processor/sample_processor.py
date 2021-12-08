@@ -57,6 +57,8 @@ class BuildFeature(ScalarFunction):
 
 class DataSourceProcessor(flink.FlinkPythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
+        uri = execution_context.config['dataset'].uri.split(',')
+        print('Raw Queue uri {}'.format(uri))
         t_env = execution_context.table_env
         t_env.execute_sql('''
                             create table raw_input (
@@ -66,14 +68,14 @@ class DataSourceProcessor(flink.FlinkPythonProcessor):
                                 proc_time as PROCTIME()
                             ) with (
                                 'connector' = 'kafka',
-                                'topic' = 'raw_input',
-                                'properties.bootstrap.servers' = 'localhost:9092',
+                                'topic' = '{}',
+                                'properties.bootstrap.servers' = '{}',
                                 'properties.group.id' = 'raw_input',
                                 'format' = 'csv',
                                 'csv.field-delimiter' = ' ',
                                 'scan.startup.mode' = 'latest-offset'
                             )
-                        ''')
+                        '''.format(uri[1], uri[0]))
         return [t_env.from_path('raw_input')]
 
 
@@ -125,17 +127,19 @@ class SampleProcessor(flink.FlinkPythonProcessor):
 
 class QueueSinkProcessor(flink.FlinkPythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
+        uri = execution_context.config['dataset'].uri.split(',')
+        print('Sample Queue uri {}'.format(uri))
         t_env = execution_context.table_env
         t_env.execute_sql('''
                             create table sample_queue (
                                 record varchar
                             ) with (
                                 'connector' = 'kafka',
-                                'topic' = 'sample_input',
-                                'properties.bootstrap.servers' = 'localhost:9092',
+                                'topic' = '{}',
+                                'properties.bootstrap.servers' = '{}',
                                 'format' = 'raw'
                             )
-                        ''')
+                        '''.format(uri[1], uri[0]))
         st_1 = execution_context.statement_set
         st_1.add_insert('sample_queue', input_list[0])
         return []
@@ -144,6 +148,8 @@ class QueueSinkProcessor(flink.FlinkPythonProcessor):
 class FileSinkProcessor(flink.FlinkPythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
         t_env = execution_context.table_env
+        uri = execution_context.config['dataset'].uri
+        print('uri {}'.format(uri))
         t_env.execute_sql('''
                            create table sample_files (
                                record varchar
@@ -154,7 +160,7 @@ class FileSinkProcessor(flink.FlinkPythonProcessor):
                                'sink.rolling-policy.rollover-interval' = '60sec',
                                'sink.rolling-policy.check-interval' = '10sec'
                            )
-                       '''.format(config.SampleFileDir))
+                       '''.format(uri))
         st_1 = execution_context.statement_set
         st_1.add_insert('sample_files', input_list[0])
         return []
