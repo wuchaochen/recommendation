@@ -22,6 +22,8 @@ import pandas as pd
 import copy
 import tensorflow as tf
 from recommendation.code.r_model import RecommendationModel, Sample
+from recommendation import config
+
 threshold = 0.3
 
 data_dir = os.path.dirname(__file__) + '/../data/'
@@ -70,7 +72,7 @@ class SampleData(object):
     @staticmethod
     def load_user_dict():
         user_dict = {}
-        with open(data_dir + '/users.csv', 'r') as f:
+        with open(config.UserDictFile, 'r') as f:
             for l in f.readlines():
                 tmp = l.split(' ')
                 user_dict[int(tmp[0])] = int(tmp[1][:-1])
@@ -295,6 +297,8 @@ def pipeline():
 
 
 if __name__ == '__main__':
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
     pipeline()
     # print(len(SampleData.load_user_dict()))
     # gen_mix_data()

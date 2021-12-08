@@ -82,15 +82,9 @@ class ModelInference(object):
         results = []
         if isinstance(indices_res, list):
             for i in range(len(indices_res)):
-                if values_res[i] > threshold:
-                    results.append(indices_res[i])
-                else:
-                    results.append(-1)
+                results.append(indices_res[i])
         else:
-            if values_res > threshold:
-                results.append(indices_res)
-            else:
-                results.append(-1)
+            results.append(indices_res)
         return results
 
     def close(self):

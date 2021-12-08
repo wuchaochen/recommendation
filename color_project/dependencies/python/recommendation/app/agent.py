@@ -72,7 +72,8 @@ class Agent(object):
 
     def write_log(self, uid, inference_result, click_result):
         print(uid, inference_result, click_result)
-        self.producer.send(topic=self.topic, value=bytes(str(uid) + ' ' + inference_result + ' ' + str(click_result), encoding='utf8'))
+        self.producer.send(topic=self.topic, value=bytes(str(uid) + ' ' + inference_result + ' ' + str(click_result),
+                                                         encoding='utf8'))
 
     def update_state(self, uid, inference_result, click_result):
         db.update_user_click_info(uid=uid, fs=inference_result + ' ' + str(click_result))
@@ -95,8 +96,11 @@ class Agent(object):
         while True:
             uid = str(self.request())
             res = client.inference(uid)
+            colors = set(map(int, res.split(',')))
             features = self.build_features(uid)
             click_result = self.click([features])
+            if click_result not in colors:
+                click_result = -1
             self.write_log(uid=uid, inference_result=res, click_result=click_result)
             time.sleep(self.interval)
 
