@@ -59,9 +59,9 @@ def workflow():
 
     af.action_on_job_status("batch_validate", "batch_train")
 
-    af.action_on_model_version_event("stream_train", config.BatchModelName, 'MODEL_GENERATED')
-    af.action_on_event("stream_train", config.BatchModelName, "*", event_type='MODEL_GENERATED',
-                       sender="batch_train", action=af.JobAction.NONE)
+    af.action_on_model_version_event("stream_train", config.BatchModelName, 'MODEL_VALIDATED')
+    af.action_on_event("stream_train", config.BatchModelName, "*", event_type='MODEL_VALIDATED',
+                       sender="batch_validate", action=af.JobAction.NONE)
 
     af.action_on_model_version_event("stream_validate", config.StreamModelName, 'MODEL_GENERATED')
     af.action_on_event("stream_validate", config.StreamModelName, "*", event_type='MODEL_GENERATED',

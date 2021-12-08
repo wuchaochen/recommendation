@@ -113,9 +113,9 @@ class StreamTrainProcessor(flink.FlinkPythonProcessor):
         broker_ip, topic = input_list[0].split(",")
         base_model_info = execution_context.config.get('base_model_info')
 
-        base_model_version_meta = client.get_latest_generated_model_version(base_model_info.name)
+        base_model_version_meta = client.get_latest_validated_model_version(base_model_info.name)
         if not base_model_version_meta:
-            raise RuntimeError("Cannot found latest generated model version of model {}".format(base_model_info))
+            raise RuntimeError("Cannot found latest validated model version of model {}".format(base_model_info))
 
         table_env = execution_context.table_env
         statement_set = execution_context.statement_set
