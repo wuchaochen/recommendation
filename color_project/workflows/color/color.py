@@ -15,34 +15,30 @@
 # specific language governing permissions and limitations
 # under the License.
 import ai_flow as af
+from ai_flow_plugins.job_plugins import flink
 
-from color_processor.train_procssor import BatchTrainDataReader, BatchTrainProcessor, StreamTrainProcessor
-from color_processor.validate_processor import BatchValidateProcessor, StreamValidateProcessor
 from color_processor.sample_processor import SampleProcessor, DataSourceProcessor, QueueSinkProcessor, \
     FileSinkProcessor, DataStreamEnv
+from color_processor.train_procssor import BatchTrainDataReader, BatchTrainProcessor, StreamTrainProcessor, \
+    TrainFlinkEnv
+from color_processor.validate_processor import BatchValidateProcessor, StreamValidateProcessor
 from recommendation import config
-from ai_flow_plugins.job_plugins import flink
 
 
 def workflow():
     af.init_ai_flow_context()
     with af.job_config(job_name='batch_train'):
-        batch_train_sample_meta = af.get_dataset_by_name(config.SampleFileName)
-        base_model_meta = af.get_model_by_name(config.BatchModelName)
-        assert batch_train_sample_meta is not None
-        data = af.read_dataset(batch_train_sample_meta, read_dataset_processor=BatchTrainDataReader())
-        af.train(data, model_info=base_model_meta, training_processor=BatchTrainProcessor(200))
+        flink.set_flink_env(TrainFlinkEnv())
+        data = af.read_dataset(config.SampleFileName, read_dataset_processor=BatchTrainDataReader())
+        af.train(data, model_info=config.BatchModelName, training_processor=BatchTrainProcessor(200))
 
     with af.job_config(job_name='batch_validate'):
         af.user_define_operation(input=None, processor=BatchValidateProcessor())
 
     with af.job_config(job_name='stream_train'):
-        stream_train_sample_meta = af.get_dataset_by_name(config.SampleQueueName)
-        base_model_meta = af.get_model_by_name(config.BatchModelName)
-        stream_model_meta = af.get_model_by_name(config.StreamModelName)
-        assert stream_train_sample_meta is not None
-        data = af.read_dataset(stream_train_sample_meta, read_dataset_processor=BatchTrainDataReader())
-        af.train(data, model_info=stream_model_meta, base_model_info=base_model_meta,
+        flink.set_flink_env(TrainFlinkEnv())
+        data = af.read_dataset(config.SampleQueueName, read_dataset_processor=BatchTrainDataReader())
+        af.train(data, model_info=config.StreamModelName, base_model_info=config.BatchModelName,
                  training_processor=StreamTrainProcessor())
 
     with af.job_config(job_name='stream_validate'):
@@ -52,7 +48,8 @@ def workflow():
         flink.set_flink_env(DataStreamEnv())
         raw_input = af.read_dataset(dataset_info=config.RawQueueName, read_dataset_processor=DataSourceProcessor())
         sample = af.user_define_operation(input=raw_input, processor=SampleProcessor())
-        af.write_dataset(input=sample, dataset_info=config.SampleQueueName, write_dataset_processor=QueueSinkProcessor())
+        af.write_dataset(input=sample, dataset_info=config.SampleQueueName,
+                         write_dataset_processor=QueueSinkProcessor())
         af.write_dataset(input=sample, dataset_info=config.SampleFileName, write_dataset_processor=FileSinkProcessor())
 
     af.action_on_job_status("batch_validate", "batch_train")
