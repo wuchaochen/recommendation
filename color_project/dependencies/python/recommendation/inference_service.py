@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import json
+import numpy
 import queue
 import random
 import threading
@@ -30,7 +31,6 @@ from recommendation.data import SampleData, ColourData
 from recommendation.code.r_model import RecommendationModel
 from recommendation.proto.service_pb2 import RecordRequest, RecordResponse
 from recommendation.proto.service_pb2_grpc import InferenceServiceServicer, add_InferenceServiceServicer_to_server
-from recommendation.app.agent_client import AgentClient
 from recommendation import db
 from recommendation import config
 
@@ -80,7 +80,7 @@ class ModelInference(object):
     def inference_click(self, record):
         indices_res, values_res = self.mon_sess.run([self.top_1_indices, self.top_1_values], feed_dict={'record:0': record})
         results = []
-        if isinstance(indices_res, list):
+        if isinstance(indices_res, list) or isinstance(indices_res, numpy.ndarray):
             for i in range(len(indices_res)):
                 if values_res[i] > threshold:
                     results.append(indices_res[i])
@@ -132,11 +132,6 @@ class InferenceUtil(object):
 
     def init_model(self):
         self.mi = ModelInference(self.checkpoint_dir)
-
-    def get_client(self):
-        if self.agent_client is None:
-            self.agent_client = AgentClient('localhost:30001')
-        return self.agent_client
 
     @db.provide_session
     def init_user_cache(self, session=None):
@@ -194,9 +189,12 @@ class InferenceUtil(object):
     def update_state(self, uid, inference_result, click_result):
         db.update_user_click_info(uid=uid, fs=inference_result + ' ' + str(click_result))
 
-    def process_request(self, uid):
-        features = self.build_features(uid)
-        inference_result = self.inference([features])
+    def process_request(self, uids):
+        batch_feature = []
+        for uid in uids:
+            features = self.build_features(uid)
+            batch_feature.append(features)
+        inference_result = self.inference(batch_feature)
         return inference_result
 
 
@@ -205,8 +203,9 @@ class InferenceService(InferenceServiceServicer):
         self.util: InferenceUtil = util
 
     def inference(self, request, context):
-        res = self.util.process_request(int(request.record))
-        return RecordResponse(record=res[0])
+        uids = request.record
+        res = self.util.process_request(uids)
+        return RecordResponse(record=res)
 
 
 class InferenceServer(object):

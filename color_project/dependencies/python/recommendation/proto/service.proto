@@ -4,11 +4,11 @@ option py_generic_services = true;
 package ai_flow;
 
 message RecordRequest {
-    string record = 1;
+    repeated int32 record = 1;
 }
 
 message RecordResponse {
-    string record = 1;
+    repeated string record = 1;
 }
 
 service AgentService {

@@ -48,25 +48,26 @@ class UpdateModel(EventWatcher):
 
 
 class Agent(object):
-    def __init__(self, user_count, checkpoint_dir, topic, interval=0.1):
+    def __init__(self, user_count, checkpoint_dir, topic, interval=0.1, batch_size=100):
         self.user_count = user_count
         self.mi = ModelInference(checkpoint_dir)
         self.producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
         self.topic = topic
         self.ns_client = NotificationClient(server_uri='localhost:50052')
         self.interval = interval
+        self.batch_size = batch_size
         self.lock = threading.Lock()
         self.ns_client.start_listen_event(key='update_agent', watcher=UpdateModel(self), event_type='update_agent',
                                           start_time=int(time.time() * 1000))
 
-    def request(self):
+    def random_user(self):
         random.seed(time.time_ns())
         return random.randint(0, self.user_count - 1)
 
     def click(self, record):
         try:
             self.lock.acquire()
-            return self.mi.inference_click(record=record)[0]
+            return self.mi.inference_click(record=record)
         finally:
             self.lock.release()
 
@@ -96,18 +97,31 @@ class Agent(object):
         start_time = time.monotonic()
         while True:
             count += 1
-            uid = str(self.request())
-            res = client.inference(uid)
-            colors = set(map(int, res.split(',')))
-            features = self.build_features(uid)
-            click_result = self.click([features])
-            if click_result not in colors:
-                click_result = -1
-            self.write_log(uid=uid, inference_result=res, click_result=click_result)
+            uids = []
+            for i in range(self.batch_size):
+                uid = self.random_user()
+                uids.append(uid)
+            colors_results = client.inference(uids)
+
+            batch_colors = []
+            batch_features = []
+            for i in range(self.batch_size):
+                colors = set(map(int, colors_results[i].split(',')))
+                batch_colors.append(colors)
+                features = self.build_features(uids[i])
+                batch_features.append(features)
+
+            click_results = self.click(batch_features)
+            for i in range(self.batch_size):
+                if click_results[i] not in batch_colors[i]:
+                    click_result = -1
+                else:
+                    click_result = click_results[i]
+                self.write_log(uid=uids[i], inference_result=colors_results[i], click_result=click_result)
             time.sleep(self.interval)
-            if count % 1000 == 0:
+            if count % 10 == 0:
                 end_time = time.monotonic()
-                print('{} records/sec'.format(1000/(end_time-start_time)))
+                print('{} records/sec'.format((10*self.batch_size)/(end_time-start_time)))
                 start_time = end_time
 
     def start(self):
@@ -121,13 +135,16 @@ class AgentService(AgentServiceServicer):
         self.agent: Agent = agent
 
     def click(self, request, context):
-        res = self.agent.click([request.record])
-        return RecordResponse(record=str(res))
+        return RecordResponse(record=[''])
 
 
 class AgentServer(object):
-    def __init__(self, checkpoint_dir, interval):
-        self.agent = Agent(user_count=100, checkpoint_dir=checkpoint_dir, topic='raw_input', interval=interval)
+    def __init__(self, checkpoint_dir, interval, batch_size=100):
+        self.agent = Agent(user_count=100,
+                           checkpoint_dir=checkpoint_dir,
+                           topic=config.RawQueueName,
+                           interval=interval,
+                           batch_size=batch_size)
         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         add_AgentServiceServicer_to_server(AgentService(self.agent), self.server)
         self.server.add_insecure_port('[::]:' + str(30001))
@@ -150,5 +167,5 @@ class AgentServer(object):
 
 if __name__ == '__main__':
     agent_model_dir = config.AgentModelDir
-    as_ = AgentServer(agent_model_dir, interval=0)
+    as_ = AgentServer(agent_model_dir, interval=0, batch_size=500)
     as_.start()

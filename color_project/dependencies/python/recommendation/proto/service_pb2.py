@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='ai_flow',
   syntax='proto3',
   serialized_options=_b('\220\001\001'),
-  serialized_pb=_b('\n\rservice.proto\x12\x07\x61i_flow\"\x1f\n\rRecordRequest\x12\x0e\n\x06record\x18\x01 \x01(\t\" \n\x0eRecordResponse\x12\x0e\n\x06record\x18\x01 \x01(\t2J\n\x0c\x41gentService\x12:\n\x05\x63lick\x12\x16.ai_flow.RecordRequest\x1a\x17.ai_flow.RecordResponse\"\x00\x32R\n\x10InferenceService\x12>\n\tinference\x12\x16.ai_flow.RecordRequest\x1a\x17.ai_flow.RecordResponse\"\x00\x42\x03\x90\x01\x01\x62\x06proto3')
+  serialized_pb=_b('\n\rservice.proto\x12\x07\x61i_flow\"\x1f\n\rRecordRequest\x12\x0e\n\x06record\x18\x01 \x03(\x05\" \n\x0eRecordResponse\x12\x0e\n\x06record\x18\x01 \x03(\t2J\n\x0c\x41gentService\x12:\n\x05\x63lick\x12\x16.ai_flow.RecordRequest\x1a\x17.ai_flow.RecordResponse\"\x00\x32R\n\x10InferenceService\x12>\n\tinference\x12\x16.ai_flow.RecordRequest\x1a\x17.ai_flow.RecordResponse\"\x00\x42\x03\x90\x01\x01\x62\x06proto3')
 )
 
 
@@ -37,8 +37,8 @@ _RECORDREQUEST = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='record', full_name='ai_flow.RecordRequest.record', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
+      number=1, type=5, cpp_type=1, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
@@ -68,8 +68,8 @@ _RECORDRESPONSE = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='record', full_name='ai_flow.RecordResponse.record', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
+      number=1, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
