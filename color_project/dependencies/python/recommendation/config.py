@@ -19,24 +19,36 @@ from recommendation import kafka_utils
 
 
 KafkaConn = 'localhost:9092'
+
+UserProfileDataset = "user_profile"
+UserProfileTableName = "user"
+UserClickDataset = "user_click"
+UserClickTableName = "user_click"
+
 RawQueueName = 'raw_input'
 SampleQueueName = 'sample_input'
-DbUserName = 'root'
-DbPassword = 'root'
+
+DbUserName = 'sxnan'
+DbPassword = 'sxnan'
 DbConn = 'mysql://{}:{}@localhost:3306/user_info'.format(DbUserName, DbPassword)
+
 ModelDir = '/tmp/model'
 BaseModelDir = ModelDir + '/base'
 TrainModelDir = ModelDir + '/train'
 BatchModelDir = TrainModelDir + '/batch'
 StreamModelDir = TrainModelDir + '/stream'
+
 DataDir = '/tmp/data'
 UserDictFile = DataDir + '/users.csv'
-SampleFileName = 'sample'
+SampleFileName = 'sample_files'
 SampleFileDir = DataDir + '/samples'
 ValidateFileDir = DataDir + '/validate'
 ValidateFilePath = ValidateFileDir + '/train_sample_1.csv'
+ValidateDataset = "validate_dataset"
+
 BatchModelName = 'batch_color_model'
 StreamModelName = 'stream_color_model'
+
 BatchACC = 'batch_acc'
 StreamACC = 'stream_acc'
 

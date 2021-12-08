@@ -14,16 +14,16 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import List, Tuple
-
 from ai_flow_plugins.job_plugins import flink
 from ai_flow_plugins.job_plugins.flink.flink_processor import ExecutionContext
 from ai_flow_plugins.job_plugins.flink.flink_wrapped_env import WrappedStatementSet, WrappedTableEnvironment
-from pyflink.table import Table, EnvironmentSettings, TableEnvironment
 from pyflink.table import ScalarFunction, FunctionContext, DataTypes
+from pyflink.table import Table, EnvironmentSettings, TableEnvironment
 from pyflink.table.udf import udf
-from recommendation import db
+from typing import List, Tuple
+
 from recommendation import config
+from recommendation import db
 
 
 class DataStreamEnv(flink.FlinkEnv):
@@ -55,7 +55,7 @@ class BuildFeature(ScalarFunction):
         return ' '.join([str(uid), str(country), f1, f2, str(click)])
 
 
-class DataSourceProcessor(flink.FlinkPythonProcessor):
+class RawInputReader(flink.FlinkPythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
         uri = execution_context.config['dataset'].uri.split(',')
         print('Raw Queue uri {}'.format(uri))
@@ -79,14 +79,12 @@ class DataSourceProcessor(flink.FlinkPythonProcessor):
         return [t_env.from_path('raw_input')]
 
 
-class SampleProcessor(flink.FlinkPythonProcessor):
+class UserProfileReader(flink.FlinkPythonProcessor):
+
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
         t_env = execution_context.table_env
-        t_env.register_function('feature',
-                                udf(f=BuildFeature(),
-                                    input_types=[DataTypes.INT(), DataTypes.STRING(), DataTypes.STRING(),
-                                                 DataTypes.STRING(), DataTypes.INT()],
-                                    result_type=DataTypes.STRING()))
+        table_name = execution_context.config['dataset'].uri
+        print("User profile table name {}".format(table_name))
         t_env.execute_sql(f'''
                             create table user_c (
                                 uid int,
@@ -94,12 +92,20 @@ class SampleProcessor(flink.FlinkPythonProcessor):
                             ) with (
                                 'connector' = 'jdbc',
                                 'url' = 'jdbc:mysql://localhost:3306/user_info',
-                                'table-name' = 'user',
+                                'table-name' = '{table_name}',
                                 'username' = '{config.DbUserName}',
                                 'password' = '{config.DbPassword}'
                             )
                                 ''')
+        return [t_env.from_path('user_c')]
 
+
+class UserClickReader(flink.FlinkPythonProcessor):
+
+    def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
+        t_env = execution_context.table_env
+        table_name = execution_context.config['dataset'].uri
+        print("User Click table name {}".format(table_name))
         t_env.execute_sql(f'''
                             create table user_click (
                                 uid int,
@@ -108,11 +114,22 @@ class SampleProcessor(flink.FlinkPythonProcessor):
                             ) with (
                                 'connector' = 'jdbc',
                                 'url' = 'jdbc:mysql://localhost:3306/user_info',
-                                'table-name' = 'user_click',
+                                'table-name' = '{table_name}',
                                 'username' = '{config.DbUserName}',
                                 'password' = '{config.DbPassword}'
                             )
                                 ''')
+        return [t_env.from_path('user_click')]
+
+
+class SampleProcessor(flink.FlinkPythonProcessor):
+    def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
+        t_env = execution_context.table_env
+        t_env.register_function('feature',
+                                udf(f=BuildFeature(),
+                                    input_types=[DataTypes.INT(), DataTypes.STRING(), DataTypes.STRING(),
+                                                 DataTypes.STRING(), DataTypes.INT()],
+                                    result_type=DataTypes.STRING()))
 
         result = t_env.sql_query('''
                     select feature(t.uid, t.country, t.infer, t.click, uc.fs_1, uc.fs_2) from

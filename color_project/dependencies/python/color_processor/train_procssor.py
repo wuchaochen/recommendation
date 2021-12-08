@@ -130,7 +130,7 @@ class StreamTrainProcessor(flink.FlinkPythonProcessor):
                         'properties.group.id' = '{topic}',
                         'format' = 'csv',
                         'csv.field-delimiter' = '|',
-                        'scan.startup.mode' = 'earliest-offset'
+                        'scan.startup.mode' = 'latest-offset'
                     )
                 ''')
 

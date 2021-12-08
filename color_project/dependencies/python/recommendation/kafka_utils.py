@@ -26,9 +26,9 @@ from kafka.admin import NewTopic
 
 
 class KafkaUtils(object):
-    def __init__(self):
+    def __init__(self, broker='localhost:9092'):
         super().__init__()
-        self.bootstrap_servers = 'localhost:9092'
+        self.bootstrap_servers = broker
         self.admin_client = KafkaAdminClient(bootstrap_servers=self.bootstrap_servers)
 
     def send_data_loop(self, file_path, topic_name,  max_epoch=None, interval=1):
