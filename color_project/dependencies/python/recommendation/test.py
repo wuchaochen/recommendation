@@ -36,7 +36,6 @@
 from notification_service.client import NotificationClient
 from notification_service.base_notification import BaseEvent
 import time
-# client = NotificationClient('localhost:50052')
-# client.send_event(BaseEvent(key='update_agent', value='/tmp/model/2', event_type='update_agent'))
-# client.send_event(BaseEvent(key='image_model', value='/tmp/model/3', event_type='Deployed'))
-print(int(time.time() * 1000))
+client = NotificationClient('localhost:50052')
+client.send_event(BaseEvent(key='update_agent', value='/tmp/model/3', event_type='update_agent'))
+client.send_event(BaseEvent(key='stream_color_model', value='/tmp/model/3', event_type='MODEL_DEPLOYED'))

@@ -143,6 +143,7 @@ class ModelTrainer(object):
                     if step % 100 == 0:
                         print("Index %d global_step %d step %d, loss: %f accuracy: %f"
                               % (index, global_step_res, step, loss_res, acc_res))
+                        sys.stdout.flush()
 
 
 def stream_train(context):

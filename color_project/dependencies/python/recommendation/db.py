@@ -126,8 +126,18 @@ def get_user_info(uid, session=None):
 
 
 @provide_session
+def get_users_info(uids, session=None):
+    return session.query(User).filter(User.uid.in_(uids)).all()
+
+
+@provide_session
 def get_user_click_info(uid, session=None):
     return session.query(UserClick).filter(UserClick.uid == uid).first()
+
+
+@provide_session
+def get_users_click_info(uids, session=None):
+    return session.query(UserClick).filter(UserClick.uid.in_(uids)).all()
 
 
 @provide_session
@@ -136,3 +146,11 @@ def update_user_click_info(uid, fs, session=None):
     user_click.fs_2 = user_click.fs_1
     user_click.fs_1 = fs
     session.commit()
+
+
+if __name__ == '__main__':
+    from recommendation import config
+    init_db(config.DbConn)
+    res = get_users_click_info([2, 3, 6])
+    for r in res:
+        print(r.uid)

@@ -54,8 +54,8 @@ StreamModelName = 'stream_color_model'
 BatchACC = 'batch_acc'
 StreamACC = 'stream_acc'
 
-AgentModelDir = '/tmp/model/base/1'
-InferenceModelDir = '/tmp/model/base/1'
+AgentModelDir = '/tmp/model/base/2'
+InferenceModelDir = '/tmp/model/base/2'
 
 threshold = 0.1
 

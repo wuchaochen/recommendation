@@ -166,14 +166,20 @@ class InferenceUtil(object):
         self.init_model()
         self.init_user_cache()
 
-    def build_features(self, uid):
-        record = []
-        record.append(uid)
-        record.append(self.user_dict[uid])
-        user_click = db.get_user_click_info(uid)
-        record.append(user_click.fs_1)
-        record.append(user_click.fs_2)
-        return ' '.join(map(lambda x: str(x), record))
+    def build_features(self, uids):
+        users_click_dict = {}
+        users_click = db.get_users_click_info(uids)
+        for i in users_click:
+            users_click_dict[i.uid] = i
+        records = []
+        for uid in uids:
+            record = []
+            record.append(uid)
+            record.append(self.user_dict[uid])
+            record.append(users_click_dict[uid].fs_1)
+            record.append(users_click_dict[uid].fs_2)
+            records.append(' '.join(map(lambda x: str(x), record)))
+        return records
 
     def inference(self, features):
         try:
@@ -182,14 +188,8 @@ class InferenceUtil(object):
         finally:
             self.lock.release()
 
-    def update_state(self, uid, inference_result, click_result):
-        db.update_user_click_info(uid=uid, fs=inference_result + ' ' + str(click_result))
-
     def process_request(self, uids):
-        batch_feature = []
-        for uid in uids:
-            features = self.build_features(uid)
-            batch_feature.append(features)
+        batch_feature = self.build_features(uids)
         inference_result = self.inference(batch_feature)
         return inference_result
 

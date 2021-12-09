@@ -77,15 +77,26 @@ class Agent(object):
     def close(self):
         self.mi.close()
 
-    def build_features(self, uid):
-        record = []
-        record.append(uid)
-        user_info = db.get_user_info(uid)
-        record.append(user_info.country)
-        user_click = db.get_user_click_info(uid)
-        record.append(user_click.fs_1)
-        record.append(user_click.fs_2)
-        return ' '.join(map(lambda x: str(x), record))
+    def build_features(self, uids):
+        users_info_dict = {}
+        users_info = db.get_users_info(uids)
+        for i in users_info:
+            users_info_dict[i.uid] = i
+
+        users_click_dict = {}
+        users_click = db.get_users_click_info(uids)
+        for i in users_click:
+            users_click_dict[i.uid] = i
+
+        records = []
+        for i in range(self.batch_size):
+            record = []
+            record.append(uids[i])
+            record.append(users_info_dict[uids[i]].country)
+            record.append(users_click_dict[uids[i]].fs_1)
+            record.append(users_click_dict[uids[i]].fs_2)
+            records.append(' '.join(map(lambda x: str(x), record)))
+        return records
 
     def action(self):
         client = InferenceClient(self.inference_uri)
@@ -98,15 +109,11 @@ class Agent(object):
                 uid = self.random_user()
                 uids.append(uid)
             colors_results = client.inference(uids)
-
             batch_colors = []
-            batch_features = []
+            batch_features = self.build_features(uids)
             for i in range(self.batch_size):
                 colors = set(map(int, colors_results[i].split(',')))
                 batch_colors.append(colors)
-                features = self.build_features(uids[i])
-                batch_features.append(features)
-
             click_results = self.click(batch_features)
             for i in range(self.batch_size):
                 if click_results[i] not in batch_colors[i]:

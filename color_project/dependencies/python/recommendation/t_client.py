@@ -18,11 +18,15 @@ from recommendation.inference_client import InferenceClient
 
 
 c = InferenceClient(uri='localhost:30002')
-r = c.inference([2, 3, 4])
+r = c.inference([2, 3, 4, 9, 20])
 print(r)
 r = c.inference([2])
 print(r)
 r = c.inference([3])
 print(r)
 r = c.inference([4])
+print(r)
+r = c.inference([9])
+print(r)
+r = c.inference([20])
 print(r)
