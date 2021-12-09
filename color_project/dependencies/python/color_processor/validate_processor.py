@@ -68,14 +68,9 @@ class StreamValidateProcessor(python.PythonProcessor):
                                    metric_value=str(acc),
                                    metric_timestamp=int(time.time()))
         if acc > 0.1:
-            deployed_version = af.get_deployed_model_version(config.StreamModelName)
-            if deployed_version:
-                af.update_model_version(model_name=config.StreamModelName,
-                                        model_version=deployed_version.version,
-                                        current_stage=af.ModelVersionStage.DEPRECATED)
             af.update_model_version(model_name=config.StreamModelName,
                                     model_version=m_version.version,
-                                    current_stage=af.ModelVersionStage.DEPLOYED)
+                                    current_stage=af.ModelVersionStage.VALIDATED)
         else:
             af.update_model_version(model_name=config.StreamModelName,
                                     model_version=m_version.version,
