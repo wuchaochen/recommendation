@@ -15,13 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 from recommendation.inference_client import InferenceClient
-from recommendation.app.agent_client import AgentClient
 
 
-# c = InferenceClient(uri='localhost:30002')
-# r = c.inference('2')
-# print(r)
-
-a = AgentClient(uri='localhost:30001')
-r = a.click('82 13 8,14,27,49,107,110 -1 29,60,65,79,86,102 60')
+c = InferenceClient(uri='localhost:30002')
+r = c.inference([2, 3, 4])
+print(r)
+r = c.inference([2])
+print(r)
+r = c.inference([3])
+print(r)
+r = c.inference([4])
 print(r)

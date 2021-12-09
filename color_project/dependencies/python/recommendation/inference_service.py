@@ -16,8 +16,6 @@
 # under the License.
 import json
 import numpy
-import queue
-import random
 import threading
 import time
 from concurrent import futures
@@ -29,12 +27,10 @@ from typing import List
 
 from recommendation.data import SampleData, ColourData
 from recommendation.code.r_model import RecommendationModel
-from recommendation.proto.service_pb2 import RecordRequest, RecordResponse
+from recommendation.proto.service_pb2 import RecordResponse
 from recommendation.proto.service_pb2_grpc import InferenceServiceServicer, add_InferenceServiceServicer_to_server
 from recommendation import db
 from recommendation import config
-
-threshold = 0.1
 
 
 class ModelInference(object):
@@ -82,12 +78,12 @@ class ModelInference(object):
         results = []
         if isinstance(indices_res, list) or isinstance(indices_res, numpy.ndarray):
             for i in range(len(indices_res)):
-                if values_res[i] > threshold:
+                if values_res[i] > config.threshold:
                     results.append(indices_res[i])
                 else:
                     results.append(-1)
         else:
-            if values_res > threshold:
+            if values_res > config.threshold:
                 results.append(indices_res)
             else:
                 results.append(-1)
@@ -203,9 +199,9 @@ class InferenceService(InferenceServiceServicer):
         self.util: InferenceUtil = util
 
     def inference(self, request, context):
-        uids = request.record
+        uids = request.uids
         res = self.util.process_request(uids)
-        return RecordResponse(record=res)
+        return RecordResponse(records=res)
 
 
 class InferenceServer(object):

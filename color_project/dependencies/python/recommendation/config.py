@@ -28,8 +28,8 @@ UserClickTableName = "user_click"
 RawQueueName = 'raw_input'
 SampleQueueName = 'sample_input'
 
-DbUserName = 'sxnan'
-DbPassword = 'sxnan'
+DbUserName = 'root'
+DbPassword = 'root'
 DbConn = 'mysql://{}:{}@localhost:3306/user_info'.format(DbUserName, DbPassword)
 
 ModelDir = '/tmp/model'
@@ -52,8 +52,10 @@ StreamModelName = 'stream_color_model'
 BatchACC = 'batch_acc'
 StreamACC = 'stream_acc'
 
-AgentModelDir = '/tmp/model/1'
-InferenceModelDir = '/tmp/model/1'
+AgentModelDir = '/tmp/model/base/1'
+InferenceModelDir = '/tmp/model/base/1'
+
+threshold = 0.1
 
 
 def init():

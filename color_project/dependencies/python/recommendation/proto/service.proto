@@ -4,17 +4,11 @@ option py_generic_services = true;
 package ai_flow;
 
 message RecordRequest {
-    repeated int32 record = 1;
+    repeated int32 uids = 1;
 }
 
 message RecordResponse {
-    repeated string record = 1;
-}
-
-service AgentService {
-  rpc click(RecordRequest) returns(RecordResponse){
-
-  }
+    repeated string records = 1;
 }
 
 service InferenceService {

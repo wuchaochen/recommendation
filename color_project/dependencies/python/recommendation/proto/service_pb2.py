@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='ai_flow',
   syntax='proto3',
   serialized_options=_b('\220\001\001'),
-  serialized_pb=_b('\n\rservice.proto\x12\x07\x61i_flow\"\x1f\n\rRecordRequest\x12\x0e\n\x06record\x18\x01 \x03(\x05\" \n\x0eRecordResponse\x12\x0e\n\x06record\x18\x01 \x03(\t2J\n\x0c\x41gentService\x12:\n\x05\x63lick\x12\x16.ai_flow.RecordRequest\x1a\x17.ai_flow.RecordResponse\"\x00\x32R\n\x10InferenceService\x12>\n\tinference\x12\x16.ai_flow.RecordRequest\x1a\x17.ai_flow.RecordResponse\"\x00\x42\x03\x90\x01\x01\x62\x06proto3')
+  serialized_pb=_b('\n\rservice.proto\x12\x07\x61i_flow\"\x1d\n\rRecordRequest\x12\x0c\n\x04uids\x18\x01 \x03(\x05\"!\n\x0eRecordResponse\x12\x0f\n\x07records\x18\x01 \x03(\t2R\n\x10InferenceService\x12>\n\tinference\x12\x16.ai_flow.RecordRequest\x1a\x17.ai_flow.RecordResponse\"\x00\x42\x03\x90\x01\x01\x62\x06proto3')
 )
 
 
@@ -36,7 +36,7 @@ _RECORDREQUEST = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='record', full_name='ai_flow.RecordRequest.record', index=0,
+      name='uids', full_name='ai_flow.RecordRequest.uids', index=0,
       number=1, type=5, cpp_type=1, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -55,7 +55,7 @@ _RECORDREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=26,
-  serialized_end=57,
+  serialized_end=55,
 )
 
 
@@ -67,7 +67,7 @@ _RECORDRESPONSE = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='record', full_name='ai_flow.RecordResponse.record', index=0,
+      name='records', full_name='ai_flow.RecordResponse.records', index=0,
       number=1, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -85,8 +85,8 @@ _RECORDRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=59,
-  serialized_end=91,
+  serialized_start=57,
+  serialized_end=90,
 )
 
 DESCRIPTOR.message_types_by_name['RecordRequest'] = _RECORDREQUEST
@@ -110,38 +110,14 @@ _sym_db.RegisterMessage(RecordResponse)
 
 DESCRIPTOR._options = None
 
-_AGENTSERVICE = _descriptor.ServiceDescriptor(
-  name='AgentService',
-  full_name='ai_flow.AgentService',
-  file=DESCRIPTOR,
-  index=0,
-  serialized_options=None,
-  serialized_start=93,
-  serialized_end=167,
-  methods=[
-  _descriptor.MethodDescriptor(
-    name='click',
-    full_name='ai_flow.AgentService.click',
-    index=0,
-    containing_service=None,
-    input_type=_RECORDREQUEST,
-    output_type=_RECORDRESPONSE,
-    serialized_options=None,
-  ),
-])
-_sym_db.RegisterServiceDescriptor(_AGENTSERVICE)
-
-DESCRIPTOR.services_by_name['AgentService'] = _AGENTSERVICE
-
-
 _INFERENCESERVICE = _descriptor.ServiceDescriptor(
   name='InferenceService',
   full_name='ai_flow.InferenceService',
   file=DESCRIPTOR,
-  index=1,
+  index=0,
   serialized_options=None,
-  serialized_start=169,
-  serialized_end=251,
+  serialized_start=92,
+  serialized_end=174,
   methods=[
   _descriptor.MethodDescriptor(
     name='inference',
@@ -156,17 +132,6 @@ _INFERENCESERVICE = _descriptor.ServiceDescriptor(
 _sym_db.RegisterServiceDescriptor(_INFERENCESERVICE)
 
 DESCRIPTOR.services_by_name['InferenceService'] = _INFERENCESERVICE
-
-AgentService = service_reflection.GeneratedServiceType('AgentService', (_service.Service,), dict(
-  DESCRIPTOR = _AGENTSERVICE,
-  __module__ = 'service_pb2'
-  ))
-
-AgentService_Stub = service_reflection.GeneratedServiceStubType('AgentService_Stub', (AgentService,), dict(
-  DESCRIPTOR = _AGENTSERVICE,
-  __module__ = 'service_pb2'
-  ))
-
 
 InferenceService = service_reflection.GeneratedServiceType('InferenceService', (_service.Service,), dict(
   DESCRIPTOR = _INFERENCESERVICE,

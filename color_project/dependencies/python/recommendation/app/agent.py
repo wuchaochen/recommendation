@@ -17,17 +17,12 @@
 import threading
 import time
 import random
-from concurrent import futures
 from typing import List
 
-import grpc
 from kafka import KafkaProducer
-from notification_service.base_notification import BaseNotification, EventWatcher, BaseEvent
+from notification_service.base_notification import EventWatcher, BaseEvent
 from notification_service.client import NotificationClient
 from recommendation.inference_service import ModelInference
-from recommendation.proto.service_pb2 import RecordRequest, RecordResponse
-from recommendation.proto.service_pb2_grpc import AgentServiceServicer, AgentServiceStub, \
-    add_AgentServiceServicer_to_server
 from recommendation.inference_client import InferenceClient
 from recommendation import db
 from recommendation import config
@@ -48,11 +43,12 @@ class UpdateModel(EventWatcher):
 
 
 class Agent(object):
-    def __init__(self, user_count, checkpoint_dir, topic, interval=0.1, batch_size=100):
+    def __init__(self, user_count, checkpoint_dir, topic, interval=0.1, batch_size=100, inference_uri='localhost:30002'):
         self.user_count = user_count
         self.mi = ModelInference(checkpoint_dir)
         self.producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
         self.topic = topic
+        self.inference_uri = inference_uri
         self.ns_client = NotificationClient(server_uri='localhost:50052')
         self.interval = interval
         self.batch_size = batch_size
@@ -92,7 +88,7 @@ class Agent(object):
         return ' '.join(map(lambda x: str(x), record))
 
     def action(self):
-        client = InferenceClient('localhost:30002')
+        client = InferenceClient(self.inference_uri)
         count = 0
         start_time = time.monotonic()
         while True:
@@ -130,42 +126,13 @@ class Agent(object):
         thread.start()
 
 
-class AgentService(AgentServiceServicer):
-    def __init__(self, agent: Agent):
-        self.agent: Agent = agent
-
-    def click(self, request, context):
-        return RecordResponse(record=[''])
-
-
-class AgentServer(object):
-    def __init__(self, checkpoint_dir, interval, batch_size=100):
-        self.agent = Agent(user_count=100,
-                           checkpoint_dir=checkpoint_dir,
-                           topic=config.RawQueueName,
-                           interval=interval,
-                           batch_size=batch_size)
-        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        add_AgentServiceServicer_to_server(AgentService(self.agent), self.server)
-        self.server.add_insecure_port('[::]:' + str(30001))
-        self._stop = threading.Event()
-
-    def start(self):
-        db.init_db(uri=config.DbConn)
-        self.server.start()
-        time.sleep(1)
-        self.agent.start()
-        try:
-            while not self._stop.is_set():
-                self._stop.wait(3600)
-        except KeyboardInterrupt:
-            self.stop()
-
-    def stop(self):
-        self.server.stop(0)
-
-
 if __name__ == '__main__':
+    db.init_db(config.DbConn)
     agent_model_dir = config.AgentModelDir
-    as_ = AgentServer(agent_model_dir, interval=0, batch_size=500)
-    as_.start()
+    as_ = Agent(user_count=100,
+                checkpoint_dir=agent_model_dir,
+                topic=config.RawQueueName,
+                interval=0,
+                batch_size=500,
+                inference_uri='localhost:30002')
+    as_.action()
