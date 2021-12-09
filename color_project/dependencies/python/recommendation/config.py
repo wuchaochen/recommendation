@@ -20,9 +20,9 @@ from recommendation import kafka_utils
 
 KafkaConn = 'localhost:9092'
 
-UserProfileDataset = "MYSQL: user_profile"
+UserProfileDataset = "MYSQL:user_profile"
 UserProfileTableName = "user"
-UserClickDataset = "MYSQL: user_click_history"
+UserClickDataset = "MYSQL:user_click_history"
 UserClickTableName = "user_click"
 
 RawQueueDataset = "Kafka:raw_input"
@@ -42,11 +42,11 @@ StreamModelDir = TrainModelDir + '/stream'
 
 DataDir = '/tmp/data'
 UserDictFile = DataDir + '/users.csv'
-SampleFileDataset = 'File: sample_dataset'
+SampleFileDataset = 'File:sample_dataset'
 SampleFileDir = DataDir + '/samples'
 ValidateFileDir = DataDir + '/validate'
 ValidateFilePath = ValidateFileDir + '/train_sample_1.csv'
-ValidateDataset = "File: validate_dataset"
+ValidateDataset = "File:validate_dataset"
 
 BatchModelName = 'batch_color_model'
 StreamModelName = 'stream_color_model'

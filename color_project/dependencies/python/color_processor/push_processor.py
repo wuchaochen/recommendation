@@ -40,7 +40,7 @@ class ModelPushProcessor(python.PythonProcessor):
                                     current_stage=af.ModelVersionStage.DEPLOYED)
             return []
 
-        if latest_validated_model_version.version < deployed_model_version.version:
+        if int(latest_validated_model_version.version) < int(deployed_model_version.version):
             # This is a staled validated model version
             print("The validated model version is staled, validated version: {}, deployed version: {}".format(
                 latest_validated_model_version.version, deployed_model_version.version))

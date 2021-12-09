@@ -35,10 +35,13 @@ def workflow():
         user_profile = af.read_dataset(dataset_info=config.UserProfileDataset,
                                        read_dataset_processor=UserProfileReader())
         user_click = af.read_dataset(dataset_info=config.UserClickDataset, read_dataset_processor=UserClickReader())
-        sample = af.user_define_operation(input=[raw_input, user_profile, user_click], processor=SampleProcessor())
+        validate_sample, sample = \
+            af.user_define_operation(input=[raw_input, user_profile, user_click], processor=SampleProcessor(), output_num=2)
+
         af.write_dataset(input=sample, dataset_info=config.SampleQueueDataset,
                          write_dataset_processor=QueueSinkProcessor())
         af.write_dataset(input=sample, dataset_info=config.SampleFileDataset, write_dataset_processor=FileSinkProcessor())
+        af.write_dataset(input=validate_sample, dataset_info=config.ValidateDataset, write_dataset_processor=FileSinkProcessor())
 
     with af.job_config(job_name='batch_train'):
         flink.set_flink_env(TrainFlinkEnv())
@@ -72,8 +75,8 @@ def workflow():
     af.action_on_event("stream_validate", config.StreamModelName, "*", event_type='MODEL_GENERATED',
                        sender="stream_train", action=af.JobAction.NONE)
 
-    af.action_on_model_version_event("model_push", config.StreamModelName, 'VALIDATED')
-    af.action_on_event("model_push", config.StreamModelName, "*", event_type='VALIDATED',
+    af.action_on_model_version_event("model_push", config.StreamModelName, 'MODEL_VALIDATED')
+    af.action_on_event("model_push", config.StreamModelName, "*", event_type='MODEL_VALIDATED',
                        sender="stream_validate", action=af.JobAction.NONE)
 
     # Run workflow
