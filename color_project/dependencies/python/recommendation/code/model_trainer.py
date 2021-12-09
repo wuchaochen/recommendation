@@ -14,11 +14,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import datetime
 import logging
 import os
 import shutil
 import sys
-import time
 
 import ai_flow as af
 import tensorflow as tf
@@ -43,7 +43,7 @@ class CheckpointSaver(tf.train.CheckpointSaverListener):
                 pass
 
     def copy_checkpoint(self) -> str:
-        target = os.path.join(self.target_dir, str(time.time()))
+        target = os.path.join(self.target_dir, datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
         logger.info("Copying model checkpoint from {} to {}".format(self.checkpoint_dir, target))
         shutil.copytree(self.checkpoint_dir, target)
         logger.info("Checkpoint copy completed")
@@ -75,12 +75,14 @@ class BatchCheckpointSaver(CheckpointSaver):
 
 
 class ModelTrainer(object):
-    def __init__(self, tf_context, hooks, batch_size, chief_only_hooks=None, base_model_checkpoint=None):
+    def __init__(self, tf_context, hooks, batch_size, chief_only_hooks=None, base_model_checkpoint=None,
+                 summary_dir=None):
         self.tf_context = tf_context
         self.hooks = hooks
         self.batch_size = batch_size
         self.chief_only_hooks = chief_only_hooks if chief_only_hooks else []
         self.base_model_checkpoint = base_model_checkpoint
+        self.summary_dir = summary_dir
         logger.info("ModelTrainer: {}".format(self.__dict__))
 
     def train(self, input_func):
@@ -130,6 +132,7 @@ class ModelTrainer(object):
                                                    checkpoint_dir=self.base_model_checkpoint,
                                                    save_checkpoint_steps=None,
                                                    save_checkpoint_secs=None,
+                                                   summary_dir=self.summary_dir,
                                                    chief_only_hooks=self.chief_only_hooks) as mon_sess:
                 step = 0
                 while not mon_sess.should_stop():
@@ -165,7 +168,8 @@ def stream_train(context):
                            hooks=[],
                            batch_size=batch_size,
                            chief_only_hooks=[checkpoint_saver_hook],
-                           base_model_checkpoint=base_model_checkpoint)
+                           base_model_checkpoint=base_model_checkpoint,
+                           summary_dir=checkpoint_dir)
     trainer.train(input_func=flink_input_func)
 
 
@@ -197,5 +201,6 @@ def batch_train(context):
     trainer = ModelTrainer(tf_context=tf_context,
                            hooks=[tf.train.StopAtStepHook(last_step=max_step)],
                            batch_size=batch_size,
-                           chief_only_hooks=[checkpoint_saver_hook])
+                           chief_only_hooks=[checkpoint_saver_hook],
+                           summary_dir=checkpoint_dir)
     trainer.train(input_func=file_input_func)
