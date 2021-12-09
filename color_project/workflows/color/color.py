@@ -17,6 +17,7 @@
 import ai_flow as af
 from ai_flow_plugins.job_plugins import flink
 
+from color_processor.push_processor import ModelPushProcessor
 from color_processor.sample_processor import SampleProcessor, RawInputReader, QueueSinkProcessor, \
     FileSinkProcessor, DataStreamEnv, UserProfileReader, UserClickReader
 from color_processor.train_procssor import BatchTrainDataReader, BatchTrainProcessor, StreamTrainProcessor, \
@@ -27,9 +28,24 @@ from recommendation import config
 
 def workflow():
     af.init_ai_flow_context()
+
+    with af.job_config(job_name='data_process'):
+        flink.set_flink_env(DataStreamEnv())
+        raw_input = af.read_dataset(dataset_info=config.RawQueueDataset, read_dataset_processor=RawInputReader())
+        user_profile = af.read_dataset(dataset_info=config.UserProfileDataset,
+                                       read_dataset_processor=UserProfileReader())
+        user_click = af.read_dataset(dataset_info=config.UserClickDataset, read_dataset_processor=UserClickReader())
+        validate_sample, sample = \
+            af.user_define_operation(input=[raw_input, user_profile, user_click], processor=SampleProcessor(), output_num=2)
+
+        af.write_dataset(input=sample, dataset_info=config.SampleQueueDataset,
+                         write_dataset_processor=QueueSinkProcessor())
+        af.write_dataset(input=sample, dataset_info=config.SampleFileDataset, write_dataset_processor=FileSinkProcessor())
+        af.write_dataset(input=validate_sample, dataset_info=config.ValidateDataset, write_dataset_processor=FileSinkProcessor())
+
     with af.job_config(job_name='batch_train'):
         flink.set_flink_env(TrainFlinkEnv())
-        sample = af.read_dataset(config.SampleFileName, read_dataset_processor=BatchTrainDataReader())
+        sample = af.read_dataset(config.SampleFileDataset, read_dataset_processor=BatchTrainDataReader())
         af.train(sample, model_info=config.BatchModelName, training_processor=BatchTrainProcessor(200))
 
     with af.job_config(job_name='batch_validate'):
@@ -38,24 +54,16 @@ def workflow():
 
     with af.job_config(job_name='stream_train'):
         flink.set_flink_env(TrainFlinkEnv())
-        sample = af.read_dataset(config.SampleQueueName, read_dataset_processor=BatchTrainDataReader())
+        sample = af.read_dataset(config.SampleQueueDataset, read_dataset_processor=BatchTrainDataReader())
         af.train(sample, model_info=config.StreamModelName, base_model_info=config.BatchModelName,
                  training_processor=StreamTrainProcessor())
 
     with af.job_config(job_name='stream_validate'):
-        sample = af.read_dataset(dataset_info=config.SampleQueueName, read_dataset_processor=ValidateDataReader())
+        sample = af.read_dataset(dataset_info=config.SampleQueueDataset, read_dataset_processor=ValidateDataReader())
         af.user_define_operation(input=sample, processor=StreamValidateProcessor())
 
-    with af.job_config(job_name='data_process'):
-        flink.set_flink_env(DataStreamEnv())
-        raw_input = af.read_dataset(dataset_info=config.RawQueueName, read_dataset_processor=RawInputReader())
-        user_profile = af.read_dataset(dataset_info=config.UserProfileDataset,
-                                       read_dataset_processor=UserProfileReader())
-        user_click = af.read_dataset(dataset_info=config.UserClickDataset, read_dataset_processor=UserClickReader())
-        sample = af.user_define_operation(input=[raw_input, user_profile, user_click], processor=SampleProcessor())
-        af.write_dataset(input=sample, dataset_info=config.SampleQueueName,
-                         write_dataset_processor=QueueSinkProcessor())
-        af.write_dataset(input=sample, dataset_info=config.SampleFileName, write_dataset_processor=FileSinkProcessor())
+    with af.job_config(job_name='model_push'):
+        af.push_model(model_info=config.StreamModelName, pushing_model_processor=ModelPushProcessor())
 
     af.action_on_job_status("batch_validate", "batch_train")
 
@@ -66,6 +74,10 @@ def workflow():
     af.action_on_model_version_event("stream_validate", config.StreamModelName, 'MODEL_GENERATED')
     af.action_on_event("stream_validate", config.StreamModelName, "*", event_type='MODEL_GENERATED',
                        sender="stream_train", action=af.JobAction.NONE)
+
+    af.action_on_model_version_event("model_push", config.StreamModelName, 'MODEL_VALIDATED')
+    af.action_on_event("model_push", config.StreamModelName, "*", event_type='MODEL_VALIDATED',
+                       sender="stream_validate", action=af.JobAction.NONE)
 
     # Run workflow
     af.workflow_operation.stop_all_workflow_executions(af.current_workflow_config().workflow_name)

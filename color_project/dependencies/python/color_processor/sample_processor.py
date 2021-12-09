@@ -50,7 +50,6 @@ class BuildFeature(ScalarFunction):
         db.init_db(uri=config.DbConn)
 
     def eval(self, uid, country, infer, click, f1, f2):
-        print(uid)
         db.update_user_click_info(uid=uid, fs=infer + ' ' + str(click))
         return ' '.join([str(uid), str(country), f1, f2, str(click)])
 
@@ -131,53 +130,69 @@ class SampleProcessor(flink.FlinkPythonProcessor):
                                                  DataTypes.STRING(), DataTypes.INT()],
                                     result_type=DataTypes.STRING()))
 
-        result = t_env.sql_query('''
-                    select feature(t.uid, t.country, t.infer, t.click, uc.fs_1, uc.fs_2) from
+        t_env.execute_sql('''
+                    create temporary view feature_view as
+                    select feature(t.uid, t.country, t.infer, t.click, uc.fs_1, uc.fs_2) as feature, 
+                        UNIX_TIMESTAMP() % 100 as bucket from
                             (select r.uid, c.country, r.infer, r.click, r.proc_time from raw_input as r
                                 left outer join user_c FOR SYSTEM_TIME AS OF r.proc_time AS c
                                 on r.uid = c.uid) as t
                             left outer join user_click FOR SYSTEM_TIME AS OF t.proc_time AS uc
                             on t.uid = uc.uid
                 ''')
-        return [result]
+
+        validate_sample = t_env.sql_query('''
+                SELECT feature FROM feature_view WHERE bucket = 0
+            ''')
+
+        train_sample = t_env.sql_query('''
+                SELECT feature FROM feature_view WHERE bucket <> 0
+        ''')
+        return [validate_sample, train_sample]
 
 
 class QueueSinkProcessor(flink.FlinkPythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
-        uri = execution_context.config['dataset'].uri.split(',')
-        print('Sample Queue uri {}'.format(uri))
+        print("QueueSinkProcessor input_list: {}".format(input_list))
+        dataset_ = execution_context.config['dataset']
+        broker, topic = dataset_.uri.split(',')
+        sink_table_name = dataset_.name.replace(':', '_')
+
         t_env = execution_context.table_env
-        t_env.execute_sql('''
-                            create table sample_queue (
+        t_env.execute_sql(f'''
+                            create table `{sink_table_name}` (
                                 record varchar
                             ) with (
                                 'connector' = 'kafka',
-                                'topic' = '{}',
-                                'properties.bootstrap.servers' = '{}',
+                                'topic' = '{topic}',
+                                'properties.bootstrap.servers' = '{broker}',
                                 'format' = 'raw'
                             )
-                        '''.format(uri[1], uri[0]))
+                        ''')
         st_1 = execution_context.statement_set
-        st_1.add_insert('sample_queue', input_list[0])
+        st_1.add_insert(sink_table_name, input_list[0])
         return []
 
 
 class FileSinkProcessor(flink.FlinkPythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
+        print("FileSinkProcessor input_list: {}".format(input_list))
+        dataset_ = execution_context.config['dataset']
+        uri = dataset_.uri
+        sink_table_name = dataset_.name.replace(':', '_')
+
         t_env = execution_context.table_env
-        uri = execution_context.config['dataset'].uri
-        print('uri {}'.format(uri))
-        t_env.execute_sql('''
-                           create table sample_files (
+        t_env.execute_sql(f'''
+                           create table `{sink_table_name}` (
                                record varchar
                            ) with (
                                'connector' = 'filesystem',
-                               'path' = '{}',
+                               'path' = '{uri}',
                                'format' = 'raw',
                                'sink.rolling-policy.rollover-interval' = '60sec',
                                'sink.rolling-policy.check-interval' = '10sec'
                            )
-                       '''.format(uri))
+                       ''')
         st_1 = execution_context.statement_set
-        st_1.add_insert('sample_files', input_list[0])
+        st_1.add_insert(sink_table_name, input_list[0])
         return []

@@ -14,6 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import glob
+import os.path
 import time
 
 import ai_flow as af
@@ -35,10 +37,12 @@ class BatchValidateProcessor(python.PythonProcessor):
     def process(self, execution_context: ExecutionContext, input_list: List) -> List:
         validate_job = ValidateJob()
         dataset = input_list[0]
+        validate_sample_dir = dataset.uri
+        validate_sample_files = glob.glob(os.path.join(validate_sample_dir, "*"))
         m_version = af.get_latest_generated_model_version(config.BatchModelName)
         deployed_version = af.get_deployed_model_version(config.BatchModelName)
         acc = validate_job.batch_validate(checkpoint_dir=m_version.model_path,
-                                          validate_files=dataset.uri,
+                                          validate_files=validate_sample_files,
                                           data_count=10000)
         af.register_metric_summary(metric_name=config.BatchACC,
                                    metric_key='acc',
@@ -68,14 +72,9 @@ class StreamValidateProcessor(python.PythonProcessor):
                                    metric_value=str(acc),
                                    metric_timestamp=int(time.time()))
         if acc > 0.1:
-            deployed_version = af.get_deployed_model_version(config.StreamModelName)
-            if deployed_version:
-                af.update_model_version(model_name=config.StreamModelName,
-                                        model_version=deployed_version.version,
-                                        current_stage=af.ModelVersionStage.DEPRECATED)
             af.update_model_version(model_name=config.StreamModelName,
                                     model_version=m_version.version,
-                                    current_stage=af.ModelVersionStage.DEPLOYED)
+                                    current_stage=af.ModelVersionStage.VALIDATED)
         else:
             af.update_model_version(model_name=config.StreamModelName,
                                     model_version=m_version.version,
