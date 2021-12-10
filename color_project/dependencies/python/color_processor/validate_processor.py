@@ -21,6 +21,8 @@ import time
 import ai_flow as af
 from ai_flow_plugins.job_plugins import python
 from ai_flow_plugins.job_plugins.python.python_processor import ExecutionContext
+from notification_service.base_notification import BaseEvent
+from notification_service.client import NotificationClient
 from typing import List
 
 from recommendation import config
@@ -52,9 +54,13 @@ class BatchValidateProcessor(python.PythonProcessor):
             af.update_model_version(model_name=config.BatchModelName,
                                     model_version=deployed_version.version,
                                     current_stage=af.ModelVersionStage.DEPRECATED)
-        af.update_model_version(model_name=config.BatchModelName,
-                                model_version=m_version.version,
-                                current_stage=af.ModelVersionStage.VALIDATED)
+        model_version = af.update_model_version(model_name=config.BatchModelName,
+                                                model_version=m_version.version,
+                                                current_stage=af.ModelVersionStage.VALIDATED)
+        notification_client = NotificationClient(af.current_project_config().get_notification_server_uri(),
+                                                 sender=execution_context.job_execution_info.job_name)
+        notification_client.send_event(BaseEvent(key=config.BatchModelName, value=model_version.model_version,
+                                                 event_type='MODEL_VALIDATED'))
         return []
 
 
@@ -72,9 +78,13 @@ class StreamValidateProcessor(python.PythonProcessor):
                                    metric_value=str(acc),
                                    metric_timestamp=int(time.time()))
         if acc > 0.1:
-            af.update_model_version(model_name=config.StreamModelName,
-                                    model_version=m_version.version,
-                                    current_stage=af.ModelVersionStage.VALIDATED)
+            model_version = af.update_model_version(model_name=config.StreamModelName,
+                                                    model_version=m_version.version,
+                                                    current_stage=af.ModelVersionStage.VALIDATED)
+            notification_client = NotificationClient(af.current_project_config().get_notification_server_uri(),
+                                                     sender=execution_context.job_execution_info.job_name)
+            notification_client.send_event(BaseEvent(key=config.StreamModelName, value=model_version.model_version,
+                                                     event_type='MODEL_VALIDATED'))
         else:
             af.update_model_version(model_name=config.StreamModelName,
                                     model_version=m_version.version,
