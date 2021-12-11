@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
+import time
+
 from pyflink.table import EnvironmentSettings, TableEnvironment, ScalarFunction, FunctionContext, DataTypes
 from pyflink.table.udf import udf
 from recommendation import db
@@ -38,7 +40,7 @@ class DataProcessor(object):
 
     def run(self):
         t_env = TableEnvironment.create(EnvironmentSettings.in_streaming_mode())
-        t_env.get_config().get_configuration().set_string("parallelism.default", "1")
+        t_env.get_config().get_configuration().set_string("parallelism.default", str(config.partition_num))
         t_env.get_config().get_configuration().set_string("execution.checkpointing.interval", "30sec")
         t_env.register_function('feature',
                                 udf(f=BuildFeature(),
@@ -65,7 +67,7 @@ class DataProcessor(object):
                     create table print (
                         record varchar
                     ) with (
-                        'connector' = 'print'
+                        'connector' = 'blackhole'
                     )
                 ''')
         t_env.execute_sql('''
@@ -126,7 +128,8 @@ class DataProcessor(object):
         ''')
         st_1 = t_env.create_statement_set()
         st_1.add_insert('sample_queue', result)
-        st_1.add_insert('sample_files', result)
+        # st_1.add_insert('sample_files', result)
+        # st_1.add_insert('print', result)
         st_1.execute().get_job_client().get_job_execution_result().result()
 
 

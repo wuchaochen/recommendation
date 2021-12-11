@@ -71,7 +71,7 @@ class StreamValidateProcessor(python.PythonProcessor):
                                    metric_key='acc',
                                    metric_value=str(acc),
                                    metric_timestamp=int(time.time()))
-        if acc > 0.1:
+        if acc > 0.5:
             af.update_model_version(model_name=config.StreamModelName,
                                     model_version=m_version.version,
                                     current_stage=af.ModelVersionStage.VALIDATED)

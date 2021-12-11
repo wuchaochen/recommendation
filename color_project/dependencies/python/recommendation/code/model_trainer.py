@@ -102,7 +102,7 @@ class ModelTrainer(object):
             with tf.device(tf.train.replica_device_setter(worker_device='/job:worker/task:' + str(index),
                                                           cluster=cluster)):
 
-                m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
+                m = RecommendationModel(colour_count=128, recommend_num=6, user_count=10000, country_count=20)
                 dataset = input_func(self.batch_size)
                 iterator = dataset.make_one_shot_iterator()
                 columns = iterator.get_next()
@@ -195,8 +195,8 @@ def batch_train(context):
     batch_model_name = tf_context.properties['batch_model_name']
     checkpoint_saver = BatchCheckpointSaver(checkpoint_dir, model_save_path, batch_model_name)
     checkpoint_saver_hook = tf.train.CheckpointSaverHook(checkpoint_dir,
-                                                         save_steps=None,
-                                                         save_secs=30,
+                                                         save_steps=200,
+                                                         save_secs=None,
                                                          listeners=[checkpoint_saver])
 
     trainer = ModelTrainer(tf_context=tf_context,

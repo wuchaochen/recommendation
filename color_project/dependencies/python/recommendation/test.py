@@ -33,9 +33,13 @@
 # with tf.Session() as sess:
 #    print(sess.run([b, predictions]))
 # print("[STREAM_VARS_2]:", sess.run(stream_vars))  # [3.0, 17.0]
+import json
 from notification_service.client import NotificationClient
 from notification_service.base_notification import BaseEvent
-import time
 client = NotificationClient('localhost:50052')
-client.send_event(BaseEvent(key='update_agent', value='/tmp/model/3', event_type='update_agent'))
-client.send_event(BaseEvent(key='stream_color_model', value='/tmp/model/3', event_type='MODEL_DEPLOYED'))
+m_path = '/tmp/model/train/stream/20211210181444'
+client.send_event(BaseEvent(key='update_agent', value=m_path, event_type='update_agent'))
+ss = '{"_model_path": "%s"}' % (m_path)
+client.send_event(BaseEvent(key='stream_color_model', value=ss, event_type='MODEL_DEPLOYED'))
+
+

@@ -70,7 +70,7 @@ class TrainJob(object):
 
         def input_table():
             table_env.execute_sql(f'''
-                        create table raw_input (
+                        create table sample_input (
                             record varchar
                         ) with (
                             'connector' = 'kafka',
@@ -82,7 +82,7 @@ class TrainJob(object):
                             'scan.startup.mode' = 'earliest-offset'
                         )
                     ''')
-            return table_env.from_path('raw_input')
+            return table_env.from_path('sample_input')
 
         work_num = 2
         ps_num = 1
@@ -123,7 +123,12 @@ if __name__ == '__main__':
     if os.path.exists('temp'):
         shutil.rmtree('temp')
     subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
+    model_dir = '/tmp/model/batch'
+    if os.path.exists(model_dir):
+        shutil.rmtree(model_dir)
+    TrainJob.batch_train('/tmp/model/test/1', '/tmp/data/sample_1')
 
-    # TrainJob.batch_train(BatchModelDir, SampleFileDir)
-
-    # TrainJob.stream_train('/tmp/model/train/batch/1638894961.2195241', config.StreamModelDir, "localhost:9092", "sample_input")
+    # TrainJob.stream_train(base_model_checkpoint_dir='/tmp/model/batch',
+    #                       stream_model_dir=config.StreamModelDir,
+    #                       kafka_broker="localhost:9092",
+    #                       topic="sample_input")

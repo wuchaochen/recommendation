@@ -37,7 +37,7 @@ class ModelInference(object):
     def __init__(self, checkpoint_dir):
         self.checkpoint_dir = checkpoint_dir
         tf.reset_default_graph()
-        m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
+        m = RecommendationModel(colour_count=128, recommend_num=6, user_count=config.user_count, country_count=20)
         record = tf.placeholder(dtype=tf.string, name='record', shape=[None])
 
         def multiply_split(value):
@@ -100,11 +100,14 @@ class DeployModel(EventWatcher):
     def process(self, events: List[BaseEvent]):
         event = events[0]
         try:
-            print(event.value)
-            model_path = json.loads(event.value)["_model_path"]
-            self.util.lock.acquire()
-            self.util.checkpoint_dir = model_path
-            self.util.init_model()
+            print(event.create_time, event.value)
+            try:
+                model_path = json.loads(event.value)["_model_path"]
+                self.util.lock.acquire()
+                self.util.checkpoint_dir = model_path
+                self.util.init_model()
+            except Exception as e:
+                pass
         finally:
             self.util.lock.release()
 
@@ -117,9 +120,11 @@ class InferenceUtil(object):
         self.mi = None
         self.agent_client = None
         self.ns_client = NotificationClient(server_uri='localhost:50052')
+        start_time = int(time.time() * 1000)
+        print(start_time)
         self.ns_client.start_listen_event(key=config.StreamModelName, watcher=DeployModel(self),
                                           event_type='MODEL_DEPLOYED',
-                                          start_time=int(time.time() * 1000))
+                                          start_time=start_time)
         self.lock = threading.Lock()
 
     def random_click_record(self):
@@ -131,36 +136,27 @@ class InferenceUtil(object):
 
     @db.provide_session
     def init_user_cache(self, session=None):
+        session.query(db.User).delete()
+        session.query(db.UserClick).delete()
         for k, v in self.user_dict.items():
             user = db.User()
             user.uid = k
             user.country = v
-            user = session.query(db.User).filter(db.User.uid == k).first()
-            if user is None:
-                user = db.User()
-                user.uid = k
-                user.country = v
-                session.add(user)
-            else:
-                user.country = v
-            session.commit()
+            session.add(user)
+        session.commit()
+
         for i in range(len(self.user_dict)):
             cc = []
             for j in range(2):
                 r, c = self.random_click_record()
                 r = ','.join(map(lambda x: str(x), r))
                 cc.append((r, c))
-            user_click = session.query(db.UserClick).filter(db.UserClick.uid == i).first()
-            if user_click is None:
-                user_click = db.UserClick()
-                user_click.uid = i
-                user_click.fs_1 = cc[0][0] + ' ' + str(cc[0][1])
-                user_click.fs_2 = cc[1][0] + ' ' + str(cc[1][1])
-                session.add(user_click)
-            else:
-                user_click.fs_1 = cc[0][0] + ' ' + str(cc[0][1])
-                user_click.fs_2 = cc[1][0] + ' ' + str(cc[1][1])
-            session.commit()
+            user_click = db.UserClick()
+            user_click.uid = i
+            user_click.fs_1 = cc[0][0] + ' ' + str(cc[0][1])
+            user_click.fs_2 = cc[1][0] + ' ' + str(cc[1][1])
+            session.add(user_click)
+        session.commit()
 
     def init(self):
         self.init_model()
@@ -191,7 +187,10 @@ class InferenceUtil(object):
     def process_request(self, uids):
         batch_feature = self.build_features(uids)
         inference_result = self.inference(batch_feature)
-        return inference_result
+        results = []
+        for i in range(len(uids)):
+            results.append(inference_result[i] + '*' + batch_feature[i])
+        return results
 
 
 class InferenceService(InferenceServiceServicer):

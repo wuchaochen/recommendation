@@ -24,10 +24,10 @@ import tensorflow as tf
 from recommendation.code.r_model import RecommendationModel, Sample
 from recommendation import config
 
-threshold = 0.3
+threshold = 0.1
 
-data_dir = os.path.dirname(__file__) + '/../../data/'
-base_model_dir = os.path.dirname(__file__) + '/../../models/base/'
+data_dir = '/tmp/data/test_data/'
+base_model_dir = '/tmp/test_models/base/'
 
 
 def random_item(size):
@@ -280,19 +280,19 @@ def gen_split_data():
 
 
 def pipeline():
-    s_data = SampleData(user_count=100, country_count=20, colour_count=128, select_count=6)
+    s_data = SampleData(user_count=config.user_count, country_count=20, colour_count=128, select_count=6)
     s_data.create_data(100000, data_dir)
     print('create random sample data.')
     u = [[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]
 
-    for i in range(1, 6):
-        gen_sample_data(user_count=100, country_count=20, index=i, units=u)
+    for i in range(1, 3):
+        gen_sample_data(user_count=config.user_count, country_count=20, index=i, units=u)
         print('create sample data step 1, index: {}'.format(i))
 
         gen_trained_data(index=i)
         print('create sample data step 2, index: {}'.format(i))
 
-        gen_training_sample(user_count=100, country_count=20, index=i, units=u)
+        gen_training_sample(user_count=config.user_count, country_count=20, index=i, units=u)
         print('create sample data step 3, index: {}'.format(i))
 
 
