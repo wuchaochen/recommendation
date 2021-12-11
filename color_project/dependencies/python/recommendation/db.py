@@ -148,9 +148,38 @@ def update_user_click_info(uid, fs, session=None):
     session.commit()
 
 
+@provide_session
+def batch_update_user_click_info(uids, batch_fs, session=None):
+    fs_dict = {}
+    for i in range(len(uids)):
+        if uids[i] not in fs_dict:
+            fs_dict[uids[i]] = []
+        fs_dict[uids[i]].append(batch_fs[i])
+
+    user_clicks = session.query(UserClick).filter(UserClick.uid.in_(uids)).all()
+    for user_click in user_clicks:
+        fs_list = fs_dict[user_click.uid]
+        if len(fs_list) == 1:
+            user_click.fs_2 = user_click.fs_1
+            user_click.fs_1 = fs_list[0]
+        else:
+            fs2 = fs_list[-2:]
+            user_click.fs_2 = fs2[0]
+            user_click.fs_1 = fs2[1]
+    session.commit()
+
+
 if __name__ == '__main__':
     from recommendation import config
     init_db(config.DbConn)
-    res = get_users_click_info([2, 3, 6])
-    for r in res:
-        print(r.uid)
+    # res = get_users_click_info([2, 3, 6])
+    # for r in res:
+    #     print(r.uid)
+    # uids = [1, 2, 3, 5, 5, 5]
+    # batch_fs = ['16,38,45,52,92,125 45',
+    #             '16,38,45,52,92,125 46',
+    #             '16,38,45,52,92,125 47',
+    #             '16,38,45,52,92,125 48',
+    #             '16,38,45,52,92,125 49',
+    #             '16,38,45,52,92,125 50']
+    # batch_update_user_click_info(uids, batch_fs)

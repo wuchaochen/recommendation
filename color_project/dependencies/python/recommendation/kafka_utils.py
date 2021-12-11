@@ -20,9 +20,10 @@
 import sys
 import time
 import uuid
-
+import os
 from kafka import KafkaProducer, KafkaConsumer, KafkaAdminClient
 from kafka.admin import NewTopic
+from recommendation import config
 
 
 class KafkaUtils(object):
@@ -57,7 +58,7 @@ class KafkaUtils(object):
             print("{} is deleted.".format(new_topic))
             time.sleep(5)
         self.admin_client.create_topics(
-            new_topics=[NewTopic(name=new_topic, num_partitions=1, replication_factor=1)])
+            new_topics=[NewTopic(name=new_topic, num_partitions=config.partition_num, replication_factor=1)])
 
     def create_topic(self, topic_name):
         topics = self.admin_client.list_topics()
@@ -103,11 +104,21 @@ class KafkaUtils(object):
         print(topics)
 
 
-if __name__ == '__main__':
+def init():
     kafka_util = KafkaUtils()
-    # kafka_util.read_data(topic='raw_input', count=100000)
-    from recommendation import config
-    kafka_util.send_data_loop(file_path=config.ValidateFilePath,
-                              topic_name=config.SampleQueueName,
-                              max_epoch=1,
-                              interval=0.1)
+    kafka_util.create_topic(config.RawQueueName)
+    kafka_util.create_topic(config.SampleQueueName)
+    if not os.path.exists(config.ModelDir):
+        os.makedirs(config.ModelDir)
+    if not os.path.exists(config.BaseModelDir):
+        os.makedirs(config.BaseModelDir)
+    if not os.path.exists(config.TrainModelDir):
+        os.makedirs(config.TrainModelDir)
+    if not os.path.exists(config.DataDir):
+        os.makedirs(config.DataDir)
+    if not os.path.exists(config.SampleFileDir):
+        os.makedirs(config.SampleFileDir)
+
+
+if __name__ == '__main__':
+    init()

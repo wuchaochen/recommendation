@@ -31,7 +31,7 @@ SampleQueueDataset = "Kafka:sample_input"
 SampleQueueName = 'sample_input'
 
 DbUserName = 'root'
-DbPassword = 'root'
+DbPassword = 'chen'
 DbConn = 'mysql://{}:{}@localhost:3306/user_info'.format(DbUserName, DbPassword)
 
 ModelDir = '/tmp/model'
@@ -54,27 +54,13 @@ StreamModelName = 'stream_color_model'
 BatchACC = 'batch_acc'
 StreamACC = 'stream_acc'
 
-AgentModelDir = '/tmp/model/base/2'
-InferenceModelDir = '/tmp/model/base/2'
+AgentModelDir = '/Users/chenwuchao/tmp/test_model/1'
+InferenceModelDir = '/Users/chenwuchao/tmp/test_model/1'
 
-threshold = 0.1
+threshold = 0.01
 
+partition_num = 1
 
-def init():
-    kafka_util = kafka_utils.KafkaUtils()
-    kafka_util.create_topic(RawQueueName)
-    kafka_util.create_topic(SampleQueueName)
-    if not os.path.exists(ModelDir):
-        os.makedirs(ModelDir)
-    if not os.path.exists(BaseModelDir):
-        os.makedirs(BaseModelDir)
-    if not os.path.exists(TrainModelDir):
-        os.makedirs(TrainModelDir)
-    if not os.path.exists(DataDir):
-        os.makedirs(DataDir)
-    if not os.path.exists(SampleFileDir):
-        os.makedirs(SampleFileDir)
+user_count = 100
 
-
-if __name__ == '__main__':
-    init()
+color_count = 32

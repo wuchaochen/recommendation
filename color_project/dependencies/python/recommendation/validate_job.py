@@ -18,10 +18,11 @@ import tensorflow as tf
 
 from recommendation.code.r_model import RecommendationModel, Sample
 from recommendation.kafka_utils import KafkaUtils
+from recommendation import config
 
 
 def run_validate(input_func, batch_size, checkpoint_dir):
-    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
+    m = RecommendationModel(colour_count=config.color_count, recommend_num=6, user_count=config.user_count, country_count=20)
     dataset = input_func(batch_size)
     iterator = dataset.make_one_shot_iterator()
     columns = iterator.get_next()

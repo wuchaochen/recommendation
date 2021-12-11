@@ -19,8 +19,7 @@ import os
 import random
 import tensorflow as tf
 from recommendation.code.r_model import RecommendationModel, Sample
-threshold = 0.3
-
+from recommendation import config
 data_dir = os.path.dirname(__file__) + '/../data/'
 base_model_dir = os.path.dirname(__file__) + '/../models/base/'
 train_model_dir = os.path.dirname(__file__) + '/../models/train/'
@@ -30,7 +29,7 @@ test_model_dir = os.path.dirname(__file__) + '/../models/test/'
 def train(index):
     tf.reset_default_graph()
     batch_size = 300
-    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
+    m = RecommendationModel(colour_count=config.color_count, recommend_num=6, user_count=config.user_count, country_count=20)
     dataset = Sample.read_label_data(data_dir + 'train_sample_{}.csv'.format(index), batch_size=batch_size)
     iterator = dataset.make_one_shot_iterator()
     columns = iterator.get_next()

@@ -17,6 +17,7 @@
 import threading
 import time
 import random
+import os
 from typing import List
 
 from kafka import KafkaProducer
@@ -38,12 +39,15 @@ class UpdateModel(EventWatcher):
             print(event.value)
             self.agent.lock.acquire()
             self.agent.mi = ModelInference(checkpoint_dir=event.value)
+        except Exception as e:
+            pass
         finally:
             self.agent.lock.release()
 
 
 class Agent(object):
-    def __init__(self, user_count, checkpoint_dir, topic, interval=0.1, batch_size=100, inference_uri='localhost:30002'):
+    def __init__(self, user_count, checkpoint_dir, topic, interval=0.1, batch_size=100, inference_uri='localhost:30002',
+                 output_dir='/tmp/data/sample1', wf=True):
         self.user_count = user_count
         self.mi = ModelInference(checkpoint_dir)
         self.producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
@@ -55,6 +59,10 @@ class Agent(object):
         self.lock = threading.Lock()
         self.ns_client.start_listen_event(key='update_agent', watcher=UpdateModel(self), event_type='update_agent',
                                           start_time=int(time.time() * 1000))
+        self.output_dir = output_dir
+        self.last_time = int(time.monotonic()*1000)
+        self.f = None
+        self.wf_flag = wf
 
     def random_user(self):
         random.seed(time.time_ns())
@@ -67,12 +75,24 @@ class Agent(object):
         finally:
             self.lock.release()
 
-    def write_log(self, uid, inference_result, click_result):
-        self.producer.send(topic=self.topic, value=bytes(str(uid) + ' ' + inference_result + ' ' + str(click_result),
-                                                         encoding='utf8'))
+    def write_log(self, batch_record, click_results):
+        if self.wf_flag:
+            current = int(time.time()*1000)
+            if current - self.last_time > 60000:
+                self.f.close()
+                self.f = open(self.output_dir + '/' + str(current), 'w')
+                self.last_time = current
 
-    def update_state(self, uid, inference_result, click_result):
-        db.update_user_click_info(uid=uid, fs=inference_result + ' ' + str(click_result))
+        for i in range(len(batch_record)):
+            res = str(batch_record[i]) + ' ' + str(click_results[i])
+            if self.wf_flag:
+                self.f.write(res)
+                self.f.write('\n')
+            self.producer.send(topic=self.topic,
+                               value=bytes(res, encoding='utf8'))
+
+    def batch_update_state(self, uids, batch_fs):
+        db.batch_update_user_click_info(uids=uids, batch_fs=batch_fs)
 
     def close(self):
         self.mi.close()
@@ -101,7 +121,12 @@ class Agent(object):
     def action(self):
         client = InferenceClient(self.inference_uri)
         count = 0
-        start_time = time.monotonic()
+        start_time = time.time()
+        self.last_time = int(time.time()*1000)
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        if self.wf_flag:
+            self.f = open(self.output_dir + '/' + str(self.last_time), 'w')
         while True:
             count += 1
             uids = []
@@ -110,20 +135,34 @@ class Agent(object):
                 uids.append(uid)
             colors_results = client.inference(uids)
             batch_colors = []
-            batch_features = self.build_features(uids)
+            # batch_features = self.build_features(uids)
+            batch_features = []
+            batch_color_str = []
             for i in range(self.batch_size):
-                colors = set(map(int, colors_results[i].split(',')))
+                tmp = colors_results[i].split('*')
+                color_str = tmp[0]
+                batch_color_str.append(color_str)
+                feature = tmp[1]
+                batch_features.append(feature)
+                colors = set(map(int, color_str.split(',')))
                 batch_colors.append(colors)
+
             click_results = self.click(batch_features)
+            click_s = []
+            batch_fs = []
             for i in range(self.batch_size):
                 if click_results[i] not in batch_colors[i]:
                     click_result = -1
                 else:
                     click_result = click_results[i]
-                self.write_log(uid=uids[i], inference_result=colors_results[i], click_result=click_result)
+                click_s.append(click_result)
+                batch_fs.append(batch_color_str[i] + ' ' + str(click_result))
+
+            self.write_log(batch_record=batch_features, click_results=click_s)
+            self.batch_update_state(uids=uids, batch_fs=batch_fs)
             time.sleep(self.interval)
             if count % 10 == 0:
-                end_time = time.monotonic()
+                end_time = time.time()
                 print('{} records/sec'.format((10*self.batch_size)/(end_time-start_time)))
                 start_time = end_time
 
@@ -136,10 +175,12 @@ class Agent(object):
 if __name__ == '__main__':
     db.init_db(config.DbConn)
     agent_model_dir = config.AgentModelDir
-    as_ = Agent(user_count=100,
+    as_ = Agent(user_count=config.user_count,
                 checkpoint_dir=agent_model_dir,
-                topic=config.RawQueueName,
-                interval=0,
-                batch_size=500,
-                inference_uri='localhost:30002')
+                topic=config.SampleQueueName,
+                interval=0.5,
+                batch_size=1000,
+                inference_uri='localhost:30002',
+                output_dir='/tmp/data/sample_1',
+                wf=False)
     as_.action()
