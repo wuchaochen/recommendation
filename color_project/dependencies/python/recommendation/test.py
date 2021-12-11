@@ -36,10 +36,13 @@
 import json
 from notification_service.client import NotificationClient
 from notification_service.base_notification import BaseEvent
-client = NotificationClient('localhost:50052')
-m_path = '/tmp/model/train/stream/20211210181444'
-client.send_event(BaseEvent(key='update_agent', value=m_path, event_type='update_agent'))
-ss = '{"_model_path": "%s"}' % (m_path)
-client.send_event(BaseEvent(key='stream_color_model', value=ss, event_type='MODEL_DEPLOYED'))
+
+if __name__ == '__main__':
+    client = NotificationClient('localhost:50052', sender='xx')
+    m_path = '/Users/chenwuchao/tmp/test_model/5'
+    i_path = '/tmp/model/train/stream/20211211141419'
+    # client.send_event(BaseEvent(key='update_agent', value=m_path, event_type='update_agent'))
+    ss = '{"_model_path": "%s"}' % (i_path)
+    client.send_event(BaseEvent(key='stream_color_model', value=ss, event_type='MODEL_DEPLOYED'))
 
 

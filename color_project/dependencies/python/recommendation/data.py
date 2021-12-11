@@ -17,6 +17,7 @@
 import random
 import csv
 import os
+import shutil
 import time
 import pandas as pd
 import copy
@@ -27,7 +28,8 @@ from recommendation import config
 threshold = 0.1
 
 data_dir = '/tmp/data/test_data/'
-base_model_dir = '/tmp/test_models/base/'
+base_model_dir = '/tmp/test_model/base/'
+units = [[8], [4], [8, 3, 3], [8, 3, 3], 4, 4]
 
 
 def random_item(size):
@@ -161,11 +163,11 @@ class SampleGenerator(object):
         return res
 
 
-def gen_sample_data(user_count, country_count, index=1, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+def gen_sample_data(user_count, country_count, index=1):
     tf.reset_default_graph()
     batch_size = 5
     sample = Sample()
-    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
+    m = RecommendationModel(colour_count=config.color_count, recommend_num=6, user_count=user_count, country_count=country_count)
     dataset = sample.read_csv(data_dir + '/sample.csv', batch_size=batch_size)
     iterator = dataset.make_one_shot_iterator()
     columns = iterator.get_next()
@@ -175,7 +177,7 @@ def gen_sample_data(user_count, country_count, index=1, units=[[8], [4], [8, 3, 
                 'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
 
     fs = m.features(features)
-    output = m.forward(fs, units)
+    output = m.forward(fs)
     output = m.output(output)
     global_step = tf.train.get_or_create_global_step()
     with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/{}'.format(index)) as mon_sess:
@@ -193,11 +195,11 @@ def gen_sample_data(user_count, country_count, index=1, units=[[8], [4], [8, 3, 
                 print('Generate org_sample.csv')
 
 
-def gen_training_sample(user_count, country_count, index=1, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+def gen_training_sample(user_count, country_count, index=1):
     tf.reset_default_graph()
     batch_size = 5
     sample = Sample()
-    m = RecommendationModel(colour_count=128, recommend_num=6, user_count=user_count, country_count=country_count)
+    m = RecommendationModel(colour_count=config.color_count, recommend_num=6, user_count=user_count, country_count=country_count)
     input_file = data_dir + 'no_label_sample_{}.csv'.format(index)
     # input_file = data_dir + 'sample.csv'
     dataset = sample.read_csv(input_file, batch_size=batch_size)
@@ -209,7 +211,7 @@ def gen_training_sample(user_count, country_count, index=1, units=[[8], [4], [8,
                 'recommend_colours_2': columns[4], 'click_colour_2': columns[5]}
 
     fs = m.features(features)
-    output = m.forward(fs, units)
+    output = m.forward(fs)
     output = m.top_one_output(output)
     global_step = tf.train.get_or_create_global_step()
     with tf.train.MonitoredTrainingSession(checkpoint_dir=base_model_dir + '/{}'.format(index)) as mon_sess:
@@ -280,20 +282,21 @@ def gen_split_data():
 
 
 def pipeline():
-    s_data = SampleData(user_count=config.user_count, country_count=20, colour_count=128, select_count=6)
-    s_data.create_data(100000, data_dir)
+    if os.path.exists('/tmp/test_model/base'):
+        shutil.rmtree('/tmp/test_model/base')
+    s_data = SampleData(user_count=config.user_count, country_count=20, colour_count=config.color_count, select_count=6)
+    s_data.create_data(100, data_dir)
     print('create random sample data.')
-    u = [[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]
 
-    for i in range(1, 3):
-        gen_sample_data(user_count=config.user_count, country_count=20, index=i, units=u)
+    for i in range(1, 2):
+        gen_sample_data(user_count=config.user_count, country_count=20, index=i)
         print('create sample data step 1, index: {}'.format(i))
 
-        gen_trained_data(index=i)
-        print('create sample data step 2, index: {}'.format(i))
-
-        gen_training_sample(user_count=config.user_count, country_count=20, index=i, units=u)
-        print('create sample data step 3, index: {}'.format(i))
+        # gen_trained_data(index=i)
+        # print('create sample data step 2, index: {}'.format(i))
+        #
+        # gen_training_sample(user_count=config.user_count, country_count=20, index=i)
+        # print('create sample data step 3, index: {}'.format(i))
 
 
 if __name__ == '__main__':

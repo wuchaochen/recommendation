@@ -31,7 +31,7 @@ SampleQueueDataset = "Kafka:sample_input"
 SampleQueueName = 'sample_input'
 
 DbUserName = 'root'
-DbPassword = 'root'
+DbPassword = 'chen'
 DbConn = 'mysql://{}:{}@localhost:3306/user_info'.format(DbUserName, DbPassword)
 
 ModelDir = '/tmp/model'
@@ -54,11 +54,13 @@ StreamModelName = 'stream_color_model'
 BatchACC = 'batch_acc'
 StreamACC = 'stream_acc'
 
-AgentModelDir = '/tmp/model/base/1'
-InferenceModelDir = '/tmp/model/base/1'
+AgentModelDir = '/Users/chenwuchao/tmp/test_model/1'
+InferenceModelDir = '/Users/chenwuchao/tmp/test_model/1'
 
-threshold = 0.1
+threshold = 0.01
 
 partition_num = 1
 
-user_count = 10000
+user_count = 100
+
+color_count = 32

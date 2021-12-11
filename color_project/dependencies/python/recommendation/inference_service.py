@@ -37,7 +37,7 @@ class ModelInference(object):
     def __init__(self, checkpoint_dir):
         self.checkpoint_dir = checkpoint_dir
         tf.reset_default_graph()
-        m = RecommendationModel(colour_count=128, recommend_num=6, user_count=config.user_count, country_count=20)
+        m = RecommendationModel(colour_count=config.color_count, recommend_num=6, user_count=config.user_count, country_count=20)
         record = tf.placeholder(dtype=tf.string, name='record', shape=[None])
 
         def multiply_split(value):
@@ -100,7 +100,7 @@ class DeployModel(EventWatcher):
     def process(self, events: List[BaseEvent]):
         event = events[0]
         try:
-            print(event.create_time, event.value)
+            print(event.create_time, event.value, event.sender, event.namespace)
             try:
                 model_path = json.loads(event.value)["_model_path"]
                 self.util.lock.acquire()
@@ -115,7 +115,7 @@ class DeployModel(EventWatcher):
 class InferenceUtil(object):
     def __init__(self, checkpoint_dir):
         self.user_dict = SampleData.load_user_dict()
-        self.colour_data = ColourData(count=128, select_count=6)
+        self.colour_data = ColourData(count=config.color_count, select_count=6)
         self.checkpoint_dir = checkpoint_dir
         self.mi = None
         self.agent_client = None

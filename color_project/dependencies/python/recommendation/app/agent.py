@@ -39,13 +39,15 @@ class UpdateModel(EventWatcher):
             print(event.value)
             self.agent.lock.acquire()
             self.agent.mi = ModelInference(checkpoint_dir=event.value)
+        except Exception as e:
+            pass
         finally:
             self.agent.lock.release()
 
 
 class Agent(object):
     def __init__(self, user_count, checkpoint_dir, topic, interval=0.1, batch_size=100, inference_uri='localhost:30002',
-                 output_dir='/tmp/data/sample1'):
+                 output_dir='/tmp/data/sample1', wf=True):
         self.user_count = user_count
         self.mi = ModelInference(checkpoint_dir)
         self.producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
@@ -60,7 +62,7 @@ class Agent(object):
         self.output_dir = output_dir
         self.last_time = int(time.monotonic()*1000)
         self.f = None
-        self.wf_flag = False
+        self.wf_flag = wf
 
     def random_user(self):
         random.seed(time.time_ns())
@@ -176,8 +178,9 @@ if __name__ == '__main__':
     as_ = Agent(user_count=config.user_count,
                 checkpoint_dir=agent_model_dir,
                 topic=config.SampleQueueName,
-                interval=0,
+                interval=0.5,
                 batch_size=1000,
                 inference_uri='localhost:30002',
-                output_dir='/tmp/data/sample_1')
+                output_dir='/tmp/data/sample_1',
+                wf=False)
     as_.action()

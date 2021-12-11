@@ -102,7 +102,7 @@ class ModelTrainer(object):
             with tf.device(tf.train.replica_device_setter(worker_device='/job:worker/task:' + str(index),
                                                           cluster=cluster)):
 
-                m = RecommendationModel(colour_count=128, recommend_num=6, user_count=10000, country_count=20)
+                m = RecommendationModel(colour_count=32, recommend_num=6, user_count=100, country_count=20)
                 dataset = input_func(self.batch_size)
                 iterator = dataset.make_one_shot_iterator()
                 columns = iterator.get_next()
@@ -132,6 +132,7 @@ class ModelTrainer(object):
                                                    checkpoint_dir=self.base_model_checkpoint,
                                                    save_checkpoint_steps=None,
                                                    save_checkpoint_secs=None,
+                                                   save_summaries_steps=2,
                                                    summary_dir=self.summary_dir,
                                                    chief_only_hooks=self.chief_only_hooks) as mon_sess:
                 step = 0
@@ -140,7 +141,7 @@ class ModelTrainer(object):
                     _, acc_res, label_res, top_indices_real_res, loss_res, global_step_res \
                         = mon_sess.run([train_op, acc, labels, top_indices_real, loss, global_step])
 
-                    if step % 100 == 0:
+                    if step % 5 == 0:
                         print("Index %d global_step %d step %d, loss: %f accuracy: %f"
                               % (index, global_step_res, step, loss_res, acc_res))
                         sys.stdout.flush()
@@ -195,7 +196,7 @@ def batch_train(context):
     batch_model_name = tf_context.properties['batch_model_name']
     checkpoint_saver = BatchCheckpointSaver(checkpoint_dir, model_save_path, batch_model_name)
     checkpoint_saver_hook = tf.train.CheckpointSaverHook(checkpoint_dir,
-                                                         save_steps=200,
+                                                         save_steps=500,
                                                          save_secs=None,
                                                          listeners=[checkpoint_saver])
 

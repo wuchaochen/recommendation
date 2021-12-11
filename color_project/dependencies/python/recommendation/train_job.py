@@ -31,7 +31,7 @@ from recommendation.config import SampleFileDir, TrainModelDir, BatchModelDir
 
 class TrainJob(object):
     @staticmethod
-    def batch_train(base_model_save_dir, sample_dir, max_step=2000):
+    def batch_train(base_model_save_dir, sample_dir, max_step=3000):
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
         statement_set = table_env.create_statement_set()
@@ -79,7 +79,7 @@ class TrainJob(object):
                             'properties.group.id' = '{topic}',
                             'format' = 'csv',
                             'csv.field-delimiter' = '|',
-                            'scan.startup.mode' = 'earliest-offset'
+                            'scan.startup.mode' = 'latest-offset'
                         )
                     ''')
             return table_env.from_path('sample_input')
@@ -123,12 +123,16 @@ if __name__ == '__main__':
     if os.path.exists('temp'):
         shutil.rmtree('temp')
     subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
-    model_dir = '/tmp/model/batch'
-    if os.path.exists(model_dir):
-        shutil.rmtree(model_dir)
-    TrainJob.batch_train('/tmp/model/test/1', '/tmp/data/sample_1')
+    # model_dir = '/tmp/model/batch'
+    # if os.path.exists(model_dir):
+    #     shutil.rmtree(model_dir)
+    # TrainJob.batch_train('/tmp/model/test/1', '/tmp/data/sample_1')
 
-    # TrainJob.stream_train(base_model_checkpoint_dir='/tmp/model/batch',
-    #                       stream_model_dir=config.StreamModelDir,
-    #                       kafka_broker="localhost:9092",
-    #                       topic="sample_input")
+    base_model_dir = '/tmp/model/test/1/20211211135301'
+    stream_model_dir = '/tmp/model/stream'
+    if os.path.exists(stream_model_dir):
+        shutil.rmtree(stream_model_dir)
+    TrainJob.stream_train(base_model_checkpoint_dir=base_model_dir,
+                          stream_model_dir=config.StreamModelDir,
+                          kafka_broker="localhost:9092",
+                          topic="sample_input")
