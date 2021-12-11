@@ -218,11 +218,10 @@ def batch_train(context):
     model_save_path = tf_context.properties['model_save_path']
     max_step = int(tf_context.properties['max_step'])
     batch_model_name = tf_context.properties['batch_model_name']
-    # checkpoint_saver = BatchCheckpointSaver(checkpoint_dir, model_save_path, batch_model_name)
-    checkpoint_saver = BatchCheckpointSaverStep(checkpoint_dir, model_save_path, batch_model_name)
+    checkpoint_saver = BatchCheckpointSaver(checkpoint_dir, model_save_path, batch_model_name)
     checkpoint_saver_hook = tf.train.CheckpointSaverHook(checkpoint_dir,
-                                                         save_steps=100,
-                                                         save_secs=None,
+                                                         save_steps=None,
+                                                         save_secs=30,
                                                          listeners=[checkpoint_saver])
 
     trainer = ModelTrainer(tf_context=tf_context,
