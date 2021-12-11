@@ -33,7 +33,7 @@ SampleQueueName = 'sample_input'
 DbUserName = 'root'
 DbPassword = 'root'
 DbConn = 'mysql://{}:{}@localhost:3306/user_info'.format(DbUserName, DbPassword)
-BaseDir = '/tmp'
+BaseDir = '/Users/chenwuchao/tmp/rc_root'
 ModelDir = BaseDir + '/model'
 BaseModelDir = ModelDir + '/base'
 TrainModelDir = ModelDir + '/train'
@@ -62,7 +62,6 @@ UserDictFile = DataDir + '/users.csv'
 SampleFileDataset = 'File:sample_dataset'
 SampleFileDir = DataDir + '/samples'
 ValidateFileDir = DataDir + '/validate'
-ValidateFilePath = ValidateFileDir + '/train_sample_1.csv'
 ValidateDataset = "File:validate_dataset"
 
 user_count = 100

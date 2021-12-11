@@ -46,7 +46,7 @@ def workflow():
     with af.job_config(job_name='batch_train'):
         flink.set_flink_env(TrainFlinkEnv())
         sample = af.read_dataset(config.SampleFileDataset, read_dataset_processor=BatchTrainDataReader())
-        af.train(sample, model_info=config.BatchModelName, training_processor=BatchTrainProcessor(200))
+        af.train(sample, model_info=config.BatchModelName, training_processor=BatchTrainProcessor(2000))
 
     with af.job_config(job_name='batch_validate'):
         sample = af.read_dataset(dataset_info=config.ValidateDataset, read_dataset_processor=ValidateDataReader())

@@ -38,8 +38,8 @@ from notification_service.base_notification import BaseEvent
 import time
 if __name__ == '__main__':
     client = NotificationClient('localhost:50052', sender='manual')
-    m_path = '/Users/chenwuchao/tmp/test_model/5'
-    i_path = '/tmp/model/train/stream/20211211141419'
-    # client.send_event(BaseEvent(key='update_agent', value=m_path, event_type='update_agent'))
+    m_path = '/Users/chenwuchao/tmp/rc_root/model/base/3'
+    i_path = '/Users/chenwuchao/tmp/rc_root/model/base/test'
+    client.send_event(BaseEvent(key='update_agent', value=m_path, event_type='update_agent'))
     ss = '{"_model_path": "%s"}' % (i_path)
-    client.send_event(BaseEvent(key='stream_color_model', value=ss, event_type='MODEL_DEPLOYED'))
+    # client.send_event(BaseEvent(key='stream_color_model', value=ss, event_type='MODEL_DEPLOYED'))

@@ -29,6 +29,24 @@ from r_model import Sample, RecommendationModel
 logger = logging.getLogger(__name__)
 
 
+def change_checkpoint_path(checkpoint_dir):
+    if not os.path.exists(checkpoint_dir):
+        raise FileNotFoundError('{} not found'.format(checkpoint_dir))
+    checkpoint_file = checkpoint_dir + '/checkpoint'
+    with open(checkpoint_file, 'r') as f:
+        lines = f.readlines()
+
+    result = []
+    for line in lines:
+        index_1 = line.find('"')
+        index_2 = line.rfind('/')
+        n_line = line[:index_1] + ' "' + checkpoint_dir + line[index_2:]
+        result.append(n_line)
+    with open(checkpoint_file, 'w') as f:
+        for l in result:
+            f.write(l)
+
+
 class CheckpointSaver(tf.train.CheckpointSaverListener):
 
     def __init__(self, checkpoint_dir, target_dir):
@@ -46,6 +64,7 @@ class CheckpointSaver(tf.train.CheckpointSaverListener):
         target = os.path.join(self.target_dir, datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
         logger.info("Copying model checkpoint from {} to {}".format(self.checkpoint_dir, target))
         shutil.copytree(self.checkpoint_dir, target)
+        change_checkpoint_path(target)
         logger.info("Checkpoint copy completed")
         return target
 
