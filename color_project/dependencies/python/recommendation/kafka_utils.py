@@ -16,13 +16,14 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-
+import os
 import sys
 import time
 import uuid
 
 from kafka import KafkaProducer, KafkaConsumer, KafkaAdminClient
 from kafka.admin import NewTopic
+from recommendation import config
 
 
 class KafkaUtils(object):
@@ -103,11 +104,21 @@ class KafkaUtils(object):
         print(topics)
 
 
-if __name__ == '__main__':
+def init():
     kafka_util = KafkaUtils()
-    # kafka_util.read_data(topic='raw_input', count=100000)
-    from recommendation import config
-    kafka_util.send_data_loop(file_path=config.ValidateFilePath,
-                              topic_name=config.SampleQueueName,
-                              max_epoch=1,
-                              interval=0.1)
+    kafka_util.create_topic(config.RawQueueName)
+    kafka_util.create_topic(config.SampleQueueName)
+    if not os.path.exists(config.ModelDir):
+        os.makedirs(config.ModelDir)
+    if not os.path.exists(config.BaseModelDir):
+        os.makedirs(config.BaseModelDir)
+    if not os.path.exists(config.TrainModelDir):
+        os.makedirs(config.TrainModelDir)
+    if not os.path.exists(config.DataDir):
+        os.makedirs(config.DataDir)
+    if not os.path.exists(config.SampleFileDir):
+        os.makedirs(config.SampleFileDir)
+
+
+if __name__ == '__main__':
+    init()

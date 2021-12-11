@@ -28,15 +28,19 @@ class RecommendationModel(object):
         self.user_count = user_count
         self.country_count = country_count
 
-    def forward(self, features, units=[[8], [4], [8, 3, 3], [8, 3, 3], 8, 4]):
+    def forward(self, features, units=[[8], [4], [8, 3, 3], [8, 3, 3], 4, 4]):
         user_layer = self.network(features['user'], units[0])
         country_layer = self.network(features['country'], units[1])
         click_1_feature = tf.concat([features['recommend_colours_1'], features['click_colour_1']], axis=1)
         r_1 = self.network(click_1_feature, units[2])
         click_2_feature = tf.concat([features['recommend_colours_2'], features['click_colour_2']], axis=1)
         r_2 = self.network(click_2_feature, units[3])
-        concat_layer = tf.concat([user_layer, country_layer, r_1, r_2], axis=1)
-        last_layer = self.network(concat_layer, [units[4], units[5], self.colour_count])
+        concat_layer_1 = tf.concat([user_layer, country_layer], axis=1)
+        concat_layer_2 = tf.concat([r_1, r_2], axis=1)
+        last_layer_1 = self.network(concat_layer_1, [units[4], self.colour_count])
+        last_layer_2 = self.network(concat_layer_2, [units[5], self.colour_count])
+        rate = 0.001
+        last_layer = (1-rate) * last_layer_1 + rate * last_layer_2
         return last_layer
 
     def features(self, features):

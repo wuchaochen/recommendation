@@ -15,9 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 import json
+import traceback
+
 import numpy
 import threading
 import time
+import trace
 from concurrent import futures
 import grpc
 import tensorflow as tf
@@ -37,7 +40,7 @@ class ModelInference(object):
     def __init__(self, checkpoint_dir):
         self.checkpoint_dir = checkpoint_dir
         tf.reset_default_graph()
-        m = RecommendationModel(colour_count=128, recommend_num=6, user_count=100, country_count=20)
+        m = RecommendationModel(colour_count=config.color_count, recommend_num=6, user_count=config.user_count, country_count=20)
         record = tf.placeholder(dtype=tf.string, name='record', shape=[None])
 
         def multiply_split(value):
@@ -100,11 +103,13 @@ class DeployModel(EventWatcher):
     def process(self, events: List[BaseEvent]):
         event = events[0]
         try:
-            print(event.value)
+            print(str(event))
             model_path = json.loads(event.value)["_model_path"]
             self.util.lock.acquire()
             self.util.checkpoint_dir = model_path
             self.util.init_model()
+        except Exception as e:
+            traceback.print_exc()
         finally:
             self.util.lock.release()
 
@@ -112,7 +117,7 @@ class DeployModel(EventWatcher):
 class InferenceUtil(object):
     def __init__(self, checkpoint_dir):
         self.user_dict = SampleData.load_user_dict()
-        self.colour_data = ColourData(count=128, select_count=6)
+        self.colour_data = ColourData(count=config.color_count, select_count=6)
         self.checkpoint_dir = checkpoint_dir
         self.mi = None
         self.agent_client = None

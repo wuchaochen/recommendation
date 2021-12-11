@@ -75,7 +75,7 @@ class BatchTrainProcessor(flink.FlinkPythonProcessor):
                 MLCONSTANTS.CONFIG_STORAGE_TYPE: MLCONSTANTS.STORAGE_ZOOKEEPER,
                 MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
                 MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
-                'checkpoint_dir': '/tmp/model/batch',
+                'checkpoint_dir': config.BatchTempModelDir,
                 'model_save_path': config.BatchModelDir,
                 'max_step': str(self.max_step),
                 'batch_model_name': config.BatchModelName,
@@ -148,7 +148,7 @@ class StreamTrainProcessor(flink.FlinkPythonProcessor):
                 "sys:csv_encode_types": 'STRING',
                 "sys:csv_decode_types": 'STRING',
                 'stream_model_name': config.StreamModelName,
-                'checkpoint_dir': '/tmp/model/stream/v1',
+                'checkpoint_dir': config.StreamTempModelDir,
                 'base_model_checkpoint': base_model_version_meta.model_path,
                 'model_save_path': config.StreamModelDir}
 

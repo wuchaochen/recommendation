@@ -136,10 +136,10 @@ class Agent(object):
 if __name__ == '__main__':
     db.init_db(config.DbConn)
     agent_model_dir = config.AgentModelDir
-    as_ = Agent(user_count=100,
+    as_ = Agent(user_count=config.user_count,
                 checkpoint_dir=agent_model_dir,
                 topic=config.RawQueueName,
-                interval=0,
+                interval=1,
                 batch_size=500,
                 inference_uri='localhost:30002')
     as_.action()

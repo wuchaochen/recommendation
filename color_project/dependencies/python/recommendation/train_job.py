@@ -31,7 +31,7 @@ from recommendation.config import SampleFileDir, TrainModelDir, BatchModelDir
 
 class TrainJob(object):
     @staticmethod
-    def batch_train(base_model_save_dir, sample_dir, max_step=2000):
+    def batch_train(base_model_save_dir, sample_dir, max_step=2500):
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
         statement_set = table_env.create_statement_set()
@@ -47,7 +47,7 @@ class TrainJob(object):
                 MLCONSTANTS.CONFIG_STORAGE_TYPE: MLCONSTANTS.STORAGE_ZOOKEEPER,
                 MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
                 MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
-                'checkpoint_dir': '/tmp/model/batch',
+                'checkpoint_dir': config.BatchTempModelDir,
                 'model_save_path': base_model_save_dir,
                 'max_step': str(max_step),
                 'batch_model_name': config.BatchModelName,
@@ -70,7 +70,7 @@ class TrainJob(object):
 
         def input_table():
             table_env.execute_sql(f'''
-                        create table raw_input (
+                        create table sample_input (
                             record varchar
                         ) with (
                             'connector' = 'kafka',
@@ -79,10 +79,10 @@ class TrainJob(object):
                             'properties.group.id' = '{topic}',
                             'format' = 'csv',
                             'csv.field-delimiter' = '|',
-                            'scan.startup.mode' = 'earliest-offset'
+                            'scan.startup.mode' = 'latest-offset'
                         )
                     ''')
-            return table_env.from_path('raw_input')
+            return table_env.from_path('sample_input')
 
         work_num = 2
         ps_num = 1
@@ -98,7 +98,7 @@ class TrainJob(object):
                 "sys:csv_encode_types": 'STRING',
                 "sys:csv_decode_types": 'STRING',
                 'stream_model_name': config.StreamModelName,
-                'checkpoint_dir': '/tmp/model/stream/v1',
+                'checkpoint_dir': config.StreamTempModelDir,
                 'base_model_checkpoint': base_model_checkpoint_dir,
                 'model_save_path': stream_model_dir}
 
@@ -124,6 +124,14 @@ if __name__ == '__main__':
         shutil.rmtree('temp')
     subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
 
-    # TrainJob.batch_train(BatchModelDir, SampleFileDir)
-
-    # TrainJob.stream_train('/tmp/model/train/batch/1638894961.2195241', config.StreamModelDir, "localhost:9092", "sample_input")
+    # if os.path.exists(config.BatchTempModelDir):
+    #     shutil.rmtree(config.BatchTempModelDir)
+    # TrainJob.batch_train(config.BatchModelDir, config.SampleFileDir)
+    #
+    # base_model_dir = '/tmp/model/test/1/20211211135301'
+    # if os.path.exists(config.StreamTempModelDir):
+    #     shutil.rmtree(config.StreamTempModelDir)
+    # TrainJob.stream_train(base_model_checkpoint_dir=base_model_dir,
+    #                       stream_model_dir=config.StreamModelDir,
+    #                       kafka_broker="localhost:9092",
+    #                       topic=config.SampleQueueName)
