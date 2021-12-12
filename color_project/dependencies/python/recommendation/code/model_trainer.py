@@ -46,8 +46,22 @@ class CheckpointSaver(tf.train.CheckpointSaverListener):
         target = os.path.join(self.target_dir, datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
         logger.info("Copying model checkpoint from {} to {}".format(self.checkpoint_dir, target))
         shutil.copytree(self.checkpoint_dir, target)
+        self._update_checkpoint_file(target, target)
         logger.info("Checkpoint copy completed")
         return target
+
+    def _update_checkpoint_file(self, checkpoint_dir, target):
+        checkpoint_file_path = os.path.join(checkpoint_dir, "checkpoint")
+        if not os.path.exists(checkpoint_file_path):
+            logger.info("checkpoint file not exist at: {}. Skip updating it".format(checkpoint_file_path))
+            return
+        with open(checkpoint_file_path, 'r+') as f:
+            content = f.read()
+            content = content.replace(self.checkpoint_dir, target)
+            f.seek(0)
+            f.truncate()
+            f.write(content)
+
 
 
 class StreamCheckpointSaver(CheckpointSaver):
@@ -72,6 +86,17 @@ class BatchCheckpointSaver(CheckpointSaver):
         target = self.copy_checkpoint()
         model_meta = self.ai_flow_client.get_model_by_name(self.batch_model_name)
         self.ai_flow_client.register_model_version(model_meta, target)
+
+
+class BatchCheckpointSaverStep(CheckpointSaver):
+
+    def __init__(self, checkpoint_dir, target_dir, batch_model_name):
+        super().__init__(checkpoint_dir, target_dir)
+        self.batch_model_name = batch_model_name
+
+    def after_save(self, session, global_step_value):
+        if global_step_value % 200 == 0:
+            self.copy_checkpoint()
 
 
 class ModelTrainer(object):
