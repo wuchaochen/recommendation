@@ -31,7 +31,7 @@ SampleQueueDataset = "Kafka:sample_input"
 SampleQueueName = 'sample_input'
 
 DbUserName = 'root'
-DbPassword = 'root'
+DbPassword = 'chen'
 DbConn = 'mysql://{}:{}@localhost:3306/user_info'.format(DbUserName, DbPassword)
 BaseDir = '/Users/chenwuchao/tmp/rc_root'
 ModelDir = BaseDir + '/model'

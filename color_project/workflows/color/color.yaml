@@ -1,4 +1,4 @@
-data_process:
+fg_and_sample_assembly:
   job_type: flink
   properties:
     run_mode: local

@@ -38,7 +38,7 @@ from notification_service.base_notification import BaseEvent
 import time
 if __name__ == '__main__':
     client = NotificationClient('localhost:50052', sender='manual')
-    m_path = '/Users/chenwuchao/tmp/rc_root/model/base/3'
+    m_path = '/Users/chenwuchao/tmp/rc_root/model/base/5'
     i_path = '/Users/chenwuchao/tmp/rc_root/model/base/test'
     client.send_event(BaseEvent(key='update_agent', value=m_path, event_type='update_agent'))
     ss = '{"_model_path": "%s"}' % (i_path)

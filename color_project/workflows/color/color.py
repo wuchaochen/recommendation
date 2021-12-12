@@ -29,24 +29,30 @@ from recommendation import config
 def workflow():
     af.init_ai_flow_context()
 
-    with af.job_config(job_name='data_process'):
+    with af.job_config(job_name='fg_and_sample_assembly'):
         flink.set_flink_env(DataStreamEnv())
         raw_input = af.read_dataset(dataset_info=config.RawQueueDataset, read_dataset_processor=RawInputReader())
         user_profile = af.read_dataset(dataset_info=config.UserProfileDataset,
                                        read_dataset_processor=UserProfileReader())
         user_click = af.read_dataset(dataset_info=config.UserClickDataset, read_dataset_processor=UserClickReader())
         validate_sample, sample = \
-            af.user_define_operation(input=[raw_input, user_profile, user_click], processor=SampleProcessor(), output_num=2)
+            af.user_define_operation(input=[raw_input, user_profile, user_click],
+                                     processor=SampleProcessor(),
+                                     output_num=2)
 
         af.write_dataset(input=sample, dataset_info=config.SampleQueueDataset,
                          write_dataset_processor=QueueSinkProcessor())
-        af.write_dataset(input=sample, dataset_info=config.SampleFileDataset, write_dataset_processor=FileSinkProcessor())
-        af.write_dataset(input=validate_sample, dataset_info=config.ValidateDataset, write_dataset_processor=FileSinkProcessor())
+        af.write_dataset(input=sample,
+                         dataset_info=config.SampleFileDataset,
+                         write_dataset_processor=FileSinkProcessor())
+        af.write_dataset(input=validate_sample,
+                         dataset_info=config.ValidateDataset,
+                         write_dataset_processor=FileSinkProcessor())
 
     with af.job_config(job_name='batch_train'):
         flink.set_flink_env(TrainFlinkEnv())
         sample = af.read_dataset(config.SampleFileDataset, read_dataset_processor=BatchTrainDataReader())
-        af.train(sample, model_info=config.BatchModelName, training_processor=BatchTrainProcessor(2000))
+        af.train(sample, model_info=config.BatchModelName, training_processor=BatchTrainProcessor(2500))
 
     with af.job_config(job_name='batch_validate'):
         sample = af.read_dataset(dataset_info=config.ValidateDataset, read_dataset_processor=ValidateDataReader())

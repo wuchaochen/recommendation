@@ -31,7 +31,7 @@ from recommendation.config import SampleFileDir, TrainModelDir, BatchModelDir
 
 class TrainJob(object):
     @staticmethod
-    def batch_train(base_model_save_dir, sample_dir, max_step=2500):
+    def batch_train(base_model_save_dir, sample_dir, max_step=3500):
         stream_env = StreamExecutionEnvironment.get_execution_environment()
         table_env = StreamTableEnvironment.create(stream_env)
         statement_set = table_env.create_statement_set()
@@ -124,9 +124,9 @@ if __name__ == '__main__':
         shutil.rmtree('temp')
     subprocess.call('zip -r code.zip code && mv code.zip /tmp/', shell=True)
 
-    # if os.path.exists(config.BatchTempModelDir):
-    #     shutil.rmtree(config.BatchTempModelDir)
-    # TrainJob.batch_train(config.BatchModelDir, config.SampleFileDir)
+    if os.path.exists(config.BatchTempModelDir):
+        shutil.rmtree(config.BatchTempModelDir)
+    TrainJob.batch_train(config.BatchModelDir, config.SampleFileDir)
     #
     # base_model_dir = '/tmp/model/test/1/20211211135301'
     # if os.path.exists(config.StreamTempModelDir):
