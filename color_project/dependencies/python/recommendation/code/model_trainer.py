@@ -23,6 +23,8 @@ import sys
 import ai_flow as af
 import tensorflow as tf
 from flink_ml_tensorflow.tensorflow_context import TFContext
+from notification_service.base_notification import BaseEvent
+from notification_service.client import NotificationClient
 
 from r_model import Sample, RecommendationModel
 
@@ -69,11 +71,14 @@ class StreamCheckpointSaver(CheckpointSaver):
     def __init__(self, checkpoint_dir, target_dir, stream_model_name):
         super().__init__(checkpoint_dir, target_dir)
         self.stream_model_name = stream_model_name
+        self.notification_client = NotificationClient(server_uri="localhost:50052", sender="stream_train")
 
     def after_save(self, session, global_step_value):
         target = self.copy_checkpoint()
         model_meta = self.ai_flow_client.get_model_by_name(self.stream_model_name)
-        self.ai_flow_client.register_model_version(model_meta, target)
+        model_version = self.ai_flow_client.register_model_version(model_meta, target)
+        self.notification_client.send_event(BaseEvent(key=self.stream_model_name, value=model_version.version,
+                                                      event_type='MODEL_GENERATED'))
 
 
 class BatchCheckpointSaver(CheckpointSaver):
@@ -81,11 +86,14 @@ class BatchCheckpointSaver(CheckpointSaver):
     def __init__(self, checkpoint_dir, target_dir, batch_model_name):
         super().__init__(checkpoint_dir, target_dir)
         self.batch_model_name = batch_model_name
+        self.notification_client = NotificationClient(server_uri="localhost:50052", sender="batch_train")
 
     def end(self, session, global_step_value):
         target = self.copy_checkpoint()
         model_meta = self.ai_flow_client.get_model_by_name(self.batch_model_name)
-        self.ai_flow_client.register_model_version(model_meta, target)
+        model_version = self.ai_flow_client.register_model_version(model_meta, target)
+        self.notification_client.send_event(BaseEvent(key=self.batch_model_name, value=model_version.version,
+                                                      event_type='MODEL_GENERATED'))
 
 
 class BatchCheckpointSaverStep(CheckpointSaver):
