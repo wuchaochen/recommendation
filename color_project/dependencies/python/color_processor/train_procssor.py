@@ -14,8 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import glob
-import os
+import time
 
 import ai_flow as af
 from ai_flow_plugins.job_plugins import flink
@@ -24,6 +23,8 @@ from ai_flow_plugins.job_plugins.flink.flink_wrapped_env import WrappedStatement
 from flink_ml_tensorflow.tensorflow_TFConfig import TFConfig
 from flink_ml_tensorflow.tensorflow_on_flink_ml import Tensorflow
 from flink_ml_tensorflow.tensorflow_on_flink_mlconf import MLCONSTANTS
+from notification_service.client import NotificationClient
+from notification_service.base_notification import BaseEvent
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import DataTypes
 from pyflink.table import StreamTableEnvironment
@@ -59,38 +60,47 @@ class BatchTrainProcessor(flink.FlinkPythonProcessor):
         self.max_step = max_step
 
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
-        sample_dir: str = input_list[0]
-
-        table_env = execution_context.table_env
-        statement_set = execution_context.statement_set
-
-        sample_files = glob.glob(os.path.join(sample_dir, "*"))
-
-        work_num = 2
-        ps_num = 1
-        python_file = "model_trainer.py"
-        func = "batch_train"
-        prop = {MLCONSTANTS.PYTHON_VERSION: '3.7',
-                MLCONSTANTS.USE_DISTRIBUTE_CACHE: 'false',
-                MLCONSTANTS.CONFIG_STORAGE_TYPE: MLCONSTANTS.STORAGE_ZOOKEEPER,
-                MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
-                MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
-                'checkpoint_dir': '/tmp/model/batch',
-                'model_save_path': config.BatchModelDir,
-                'max_step': str(self.max_step),
-                'batch_model_name': config.BatchModelName,
-                'input_files': ",".join(sample_files)}
-        env_path = None
-
-        tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
-
-        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
-                                table_env, statement_set)
-
-        tensorflow.fit()
-        execution_context.statement_set.wrapped_context.need_execute = True
-
+        time.sleep(config.BatchTrainTime)
+        model = af.get_model_by_name(config.BatchModelName)
+        model_version = af.register_model_version(model, "")
+        notification_client = NotificationClient(af.current_project_config().get_notification_server_uri(),
+                                                 default_namespace='default',
+                                                 sender=execution_context.job_execution_info.job_name)
+        notification_client.send_event(BaseEvent(key=config.BatchModelName, value=model_version.version,
+                                                 event_type='MODEL_GENERATED'))
         return []
+        # sample_dir: str = input_list[0]
+        #
+        # table_env = execution_context.table_env
+        # statement_set = execution_context.statement_set
+        #
+        # sample_files = glob.glob(os.path.join(sample_dir, "*"))
+        #
+        # work_num = 2
+        # ps_num = 1
+        # python_file = "model_trainer.py"
+        # func = "batch_train"
+        # prop = {MLCONSTANTS.PYTHON_VERSION: '3.7',
+        #         MLCONSTANTS.USE_DISTRIBUTE_CACHE: 'false',
+        #         MLCONSTANTS.CONFIG_STORAGE_TYPE: MLCONSTANTS.STORAGE_ZOOKEEPER,
+        #         MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
+        #         MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
+        #         'checkpoint_dir': '/tmp/model/batch',
+        #         'model_save_path': config.BatchModelDir,
+        #         'max_step': str(self.max_step),
+        #         'batch_model_name': config.BatchModelName,
+        #         'input_files': ",".join(sample_files)}
+        # env_path = None
+        #
+        # tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
+        #
+        # tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
+        #                         table_env, statement_set)
+        #
+        # tensorflow.fit()
+        # execution_context.statement_set.wrapped_context.need_execute = True
+        #
+        # return []
 
 
 class StreamTrainDataReader(flink.FlinkPythonProcessor):
@@ -102,65 +112,75 @@ class StreamTrainDataReader(flink.FlinkPythonProcessor):
 class StreamTrainProcessor(flink.FlinkPythonProcessor):
 
     def process(self, execution_context: ExecutionContext, input_list: List[Table] = None) -> List[Table]:
+        aiflow_client = af.get_ai_flow_client()
         while True:
-            try:
-                af.init_ai_flow_client("localhost:50051", "color_project", notification_server_uri="localhost:50052")
-                client = af.get_ai_flow_client()
-                break
-            except Exception:
-                pass
-
-        broker_ip, topic = input_list[0].split(",")
-        base_model_info = execution_context.config.get('base_model_info')
-
-        base_model_version_meta = client.get_latest_validated_model_version(base_model_info.name)
-        if not base_model_version_meta:
-            raise RuntimeError("Cannot found latest validated model version of model {}".format(base_model_info))
-
-        table_env = execution_context.table_env
-        statement_set = execution_context.statement_set
-
-        table_env.execute_sql(f'''
-                    create table raw_input (
-                        record varchar
-                    ) with (
-                        'connector' = 'kafka',
-                        'topic' = '{topic}',
-                        'properties.bootstrap.servers' = '{broker_ip}',
-                        'properties.group.id' = '{topic}',
-                        'format' = 'csv',
-                        'csv.field-delimiter' = '|',
-                        'scan.startup.mode' = 'latest-offset'
-                    )
-                ''')
-
-        work_num = 2
-        ps_num = 1
-        python_file = "model_trainer.py"
-        func = "stream_train"
-        prop = {MLCONSTANTS.PYTHON_VERSION: '3.7',
-                MLCONSTANTS.USE_DISTRIBUTE_CACHE: 'false',
-                MLCONSTANTS.CONFIG_STORAGE_TYPE: MLCONSTANTS.STORAGE_ZOOKEEPER,
-                MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
-                MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
-                MLCONSTANTS.ENCODING_CLASS: 'com.alibaba.flink.ml.operator.coding.RowCSVCoding',
-                MLCONSTANTS.DECODING_CLASS: 'com.alibaba.flink.ml.operator.coding.RowCSVCoding',
-                "sys:csv_encode_types": 'STRING',
-                "sys:csv_decode_types": 'STRING',
-                'stream_model_name': config.StreamModelName,
-                'checkpoint_dir': '/tmp/model/stream/v1',
-                'base_model_checkpoint': base_model_version_meta.model_path,
-                'model_save_path': config.StreamModelDir}
-
-        env_path = None
-        input_tb = table_env.from_path('raw_input')
-
-        tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
-
-        tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
-                                table_env=table_env,
-                                statement_set=statement_set)
-        tensorflow.fit(input_tb)
-        execution_context.statement_set.wrapped_context.need_execute = True
-
-        return []
+            time.sleep(config.StreamTrainTime)
+            model = aiflow_client.get_model_by_name(config.StreamModelName)
+            model_version = aiflow_client.register_model_version(model, "")
+            notification_client = NotificationClient(af.current_project_config().get_notification_server_uri(),
+                                                     default_namespace='default',
+                                                     sender=execution_context.job_execution_info.job_name)
+            notification_client.send_event(BaseEvent(key=config.StreamModelName, value=model_version.version,
+                                                     event_type='MODEL_GENERATED'))
+        # while True:
+        #     try:
+        #         af.init_ai_flow_client("localhost:50051", "color_project", notification_server_uri="localhost:50052")
+        #         client = af.get_ai_flow_client()
+        #         break
+        #     except Exception:
+        #         pass
+        #
+        # broker_ip, topic = input_list[0].split(",")
+        # base_model_info = execution_context.config.get('base_model_info')
+        #
+        # base_model_version_meta = client.get_latest_validated_model_version(base_model_info.name)
+        # if not base_model_version_meta:
+        #     raise RuntimeError("Cannot found latest validated model version of model {}".format(base_model_info))
+        #
+        # table_env = execution_context.table_env
+        # statement_set = execution_context.statement_set
+        #
+        # table_env.execute_sql(f'''
+        #             create table raw_input (
+        #                 record varchar
+        #             ) with (
+        #                 'connector' = 'kafka',
+        #                 'topic' = '{topic}',
+        #                 'properties.bootstrap.servers' = '{broker_ip}',
+        #                 'properties.group.id' = '{topic}',
+        #                 'format' = 'csv',
+        #                 'csv.field-delimiter' = '|',
+        #                 'scan.startup.mode' = 'latest-offset'
+        #             )
+        #         ''')
+        #
+        # work_num = 2
+        # ps_num = 1
+        # python_file = "model_trainer.py"
+        # func = "stream_train"
+        # prop = {MLCONSTANTS.PYTHON_VERSION: '3.7',
+        #         MLCONSTANTS.USE_DISTRIBUTE_CACHE: 'false',
+        #         MLCONSTANTS.CONFIG_STORAGE_TYPE: MLCONSTANTS.STORAGE_ZOOKEEPER,
+        #         MLCONSTANTS.CONFIG_ZOOKEEPER_CONNECT_STR: 'localhost:2181',
+        #         MLCONSTANTS.REMOTE_CODE_ZIP_FILE: 'file:///tmp/code.zip',
+        #         MLCONSTANTS.ENCODING_CLASS: 'com.alibaba.flink.ml.operator.coding.RowCSVCoding',
+        #         MLCONSTANTS.DECODING_CLASS: 'com.alibaba.flink.ml.operator.coding.RowCSVCoding',
+        #         "sys:csv_encode_types": 'STRING',
+        #         "sys:csv_decode_types": 'STRING',
+        #         'stream_model_name': config.StreamModelName,
+        #         'checkpoint_dir': '/tmp/model/stream/v1',
+        #         'base_model_checkpoint': base_model_version_meta.model_path,
+        #         'model_save_path': config.StreamModelDir}
+        #
+        # env_path = None
+        # input_tb = table_env.from_path('raw_input')
+        #
+        # tf_config = TFConfig(work_num, ps_num, prop, python_file, func, env_path)
+        #
+        # tensorflow = Tensorflow(tf_config, ["top_1_indices", "top_1_values"], [DataTypes.STRING(), DataTypes.STRING()],
+        #                         table_env=table_env,
+        #                         statement_set=statement_set)
+        # tensorflow.fit(input_tb)
+        # execution_context.statement_set.wrapped_context.need_execute = True
+        #
+        # return []

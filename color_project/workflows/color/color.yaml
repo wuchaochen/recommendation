@@ -5,6 +5,8 @@ data_process:
 
 batch_train:
   job_type: flink
+  periodic_config:
+    interval: '0,0,0,30'
   properties:
     run_mode: local
 
