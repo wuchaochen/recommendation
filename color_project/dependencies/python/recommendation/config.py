@@ -59,6 +59,12 @@ InferenceModelDir = '/tmp/model/base/2'
 
 threshold = 0.1
 
+BatchTrainTime = 5
+BatchValidateTime = 1
+StreamTrainTime = 10
+StreamValidateTime = 1
+
+
 
 def init():
     kafka_util = kafka_utils.KafkaUtils()
